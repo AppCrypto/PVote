@@ -13,6 +13,9 @@ contract DAOsForVote {
     uint256 constant G1x  = 1;
     uint256 constant G1y  = 2;
 
+    uint256 constant H1x  = 1368015179489954701390400359078579693043519447331113978918064868415326638035;
+    uint256 constant H1y  = 9918110051302171585080402603319702774565515993150576347155970296011118125764;
+
     struct G1Point {
 		uint X;
 		uint Y;
@@ -67,21 +70,49 @@ contract DAOsForVote {
         require(success, "elliptic curve multiplication failed");
     }
 
-    function bn128_check_pairing(uint256[12] memory input)
-    public returns (bool) {
-        uint256[1] memory result;
-        bool success;
-        assembly {
-            // 0x08     id of precompiled bn256Pairing contract     (checking the elliptic curve pairings)
-            // 0        number of ether to transfer
-            // 384       size of call parameters, i.e. 12*256 bits == 384 bytes
-            // 32        size of result (one 32 byte boolean!)
-            success := call(sub(gas(), 2000), 0x08, 0, input, 384, result, 32)
-        }
-        require(success, "elliptic curve pairing failed");
-        return result[0] == 1;
-    }
+    function pairing(G1Point[] memory p1, G2Point[] memory p2) view internal returns (bool)
+    {
+		require(p1.length == p2.length);
+		uint elements = p1.length;
+		uint inputSize = elements * 6;
+		uint[] memory input = new uint[](inputSize);
+		for (uint i = 0; i < elements; i++)
+		{
+			input[i * 6 + 0] = p1[i].X;
+			input[i * 6 + 1] = p1[i].Y;
+			input[i * 6 + 2] = p2[i].X[0];
+			input[i * 6 + 3] = p2[i].X[1];
+			input[i * 6 + 4] = p2[i].Y[0];
+			input[i * 6 + 5] = p2[i].Y[1];
+		}
+		uint[1] memory out;
+		bool success;
+		assembly {
+			success := staticcall(sub(gas()	, 2000), 8, add(input, 0x20), mul(inputSize, 0x20), out, 0x20)
+			// Use "invalid" to make gas estimation work
+			//switch success case 0 { invalid }
+		}
+		require(success);
+		return out[0] != 0;
+	}
 
+    /// Convenience method for a pairing check for three pairs.
+	/// Convenience method for a pairing check for three pairs.
+	function pairingProd3(
+			G1Point memory a1, G2Point memory a2,
+			G1Point memory b1, G2Point memory b2,
+			G1Point memory c1, G2Point memory c2
+	) internal returns (bool) {
+		G1Point[] memory p1 = new G1Point[](3);
+		G2Point[] memory p2 = new G2Point[](3);
+		p1[0] = a1;
+		p1[1] = b1;
+		p1[2] = c1;
+		p2[0] = a2;
+		p2[1] = b2;
+		p2[2] = c2;
+		return pairing(p1, p2);
+	}
 
     function DLEQ_verify(
         uint256[2] memory x1, uint256[2] memory y1,
@@ -113,20 +144,83 @@ contract DAOsForVote {
         uint256[2][] memory V, uint256[] memory lagrange_coefficient,
         uint256[2] memory U_j
     )
-    public returns (uint256[2] memory a1)
+    public returns (bool proof1, bool proof2)
+    {
+        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient);
+        proof1 = ZKRP_verify1(C1_j, C_j, c, z3);
+        proof2 = ZKRP_verify2(U1_j, U_j, c, z3, z1);
+        //proof_is_valid = proof1 && proof2; 
+    }
+
+    function  Interpolate(
+        uint256[2][] memory V, uint256[] memory lagrange_coefficient
+    )
+    public returns (uint256[2] memory)
     {
         uint256[2] memory a1; //acc=g
         uint256[2] memory temp;
-        a1[0] = 1;
-        a1[1] = 2;
+        a1[0] = H1x;
+        a1[1] = H1y;
         uint elements=lagrange_coefficient.length;//to get the array length 
-        for(uint i=0;i<=elements-1;i++)
+        for(uint i=0;i<elements;i++)
         {
             temp = bn128_multiply([V[i][0], V[i][1],lagrange_coefficient[i]]);
             a1 = bn128_add([a1[0], a1[1], temp[0], temp[1]]);
         }
-        a1=bn128_add([a1[0], a1[1], 1, 2]);
-
-
+        a1=bn128_add([a1[0], a1[1], 1368015179489954701390400359078579693043519447331113978918064868415326638035, 11970132820537103637166003141937572314130795164147247315533067598634108082819]); // add neg(H1)
+        return a1;
     }
+    
+    function ZKRP_verify1(
+        uint256[2] memory C1_j, uint256[2] memory C_j,
+        uint256 c, uint256 z3
+    )
+    public returns (bool proof_is_valid)
+    {
+        uint256[2] memory temp;
+        uint256[2] memory temp2;
+        uint256[2] memory temp3;
+        temp2 = bn128_multiply([C_j[0], C_j[1], c]);  // NEED C_j to  Interpolate
+        temp3 = bn128_multiply([H1x, H1y, z3]);
+        temp = bn128_add([temp2[0], temp2[1], temp3[0], temp3[1]]);
+        proof_is_valid = C1_j[0] == temp[0] && C1_j[1] == temp[1];    
+    }
+
+    function ZKRP_verify2(
+        uint256[2] memory U1_j, uint256[2] memory U_j,
+        uint256 c, uint256 z3, uint256 z1
+    )
+    public returns (bool proof_is_valid)
+    {
+        uint256[2] memory temp;
+        uint256[2] memory temp2;
+        uint256[2] memory temp3;
+        uint256[2] memory temp4;
+
+        temp2 = bn128_multiply([U_j[0], U_j[1], c]);
+        temp3 = bn128_multiply([G1x, G1y, z3]);
+        temp4 = bn128_multiply([H1x, H1y, z1]);
+
+
+        temp = bn128_add([temp2[0], temp2[1], temp3[0], temp3[1]]);
+        temp = bn128_add([temp[0], temp[1], temp4[0],temp4[1]]);
+        proof_is_valid=U1_j[0] == temp[0] && U1_j[1] == temp[1];
+        
+    }
+
+    function ZKRP_verify3(
+        uint256[2] memory F_j, uint256[2] memory E_j,
+        uint256[2] memory U1_j, uint256[2] memory C1_j,
+        uint256 c, uint256 z1,
+        uint256 z2, uint256 z3,
+        uint256[2][] memory V, uint256[] memory lagrange_coefficient,
+        uint256[2] memory U_j
+    )
+    public returns (bool proof_is_valid)
+    {
+        //数据转换在这里
+        //pairingProd3();
+        
+    }
+
 }
