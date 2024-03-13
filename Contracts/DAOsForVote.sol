@@ -1,5 +1,5 @@
 pragma solidity ^0.8.0;
-pragma experimental ABIEncoderV2;
+
 
 contract DAOsForVote {
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -14,36 +14,86 @@ contract DAOsForVote {
     uint256 constant G1x  = 1;
     uint256 constant G1y  = 2;
 
-    uint256 constant H1x  = 1368015179489954701390400359078579693043519447331113978918064868415326638035;
-    uint256 constant H1y  = 9918110051302171585080402603319702774565515993150576347155970296011118125764;
+    uint256 constant negG1x = 1;
+    uint256 constant negG1y = 21888242871839275222246405745257275088696311157297823662689037894645226208581;
+
+    uint256 constant H1x  = 15264291051155210722230395084766962011373976396997290700295946518477517838363;
+    uint256 constant H1y  = 18062169012241050521396281509436922807270932827014386397365657617881670284318;
+
+    uint256 constant negH1x  = 15264291051155210722230395084766962011373976396997290700295946518477517838363;
+    uint256 constant negH1y  = 3826073859598224700850124235820352281425378330283437265323380276763555924265;
 
     uint256 constant G2xx = 10857046999023057135944570762232829481370756359578518086990519993285655852781;
     uint256 constant G2xy = 11559732032986387107991004021392285783925812861821192530917403151452391805634;
     uint256 constant G2yx = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
     uint256 constant G2yy = 4082367875863433681332203403145435568316851327593401208105741076214120093531;
 
-    /*
-    uint256[4]  pk_I;
-
-    constructor() {
-        pk_I = [20331578033341841693410649242917063727105965400640207949509279929227010480456, 
-                15096605074003995872750883394963702041916000941872390680259053896009096470112, 
-                2923532663452579377027690794143952696033614311423691797654954568321831627808, 
-                15189645098168318130768182149190091933949431152809108290229108995865581338569];
-        
-    }
-    */
 
     struct G1Point {
-		uint256 X;
-		uint256 Y;
+		uint X;
+		uint Y;
 	}
 
 	// Encoding of field elements is: X[0] * z + X[1]
 	struct G2Point {
-		uint256[2] X;
-		uint256[2] Y;
+		uint[2] X;
+		uint[2] Y;
 	}
+
+    uint256[2]   G1PointU;
+    uint256[2][] G1PointC;
+    uint256[2][] G1PointV;
+
+    function Init(uint elements) public
+    {
+
+        uint256[2] memory G1Point;
+        G1Point=[G1x,G1y];   // Initialize G1Point
+        G1PointU=[1,2];
+
+
+        //G1Point[] memory g1points= new G1Point[](elements);
+
+        for (uint i = 0; i < elements; i++) {
+            uint256[2] memory newStruct = G1Point;
+            G1PointC.push(newStruct);
+            G1PointV.push(newStruct);
+        }
+    }
+
+    function ReturnData() public  returns (uint256[2][] memory, uint256[2][] memory, uint256[2] memory) {
+        uint elements = G1PointC.length;
+        for (uint i = 0; i < elements; i++)
+        {
+            G1PointC[i] = bn128_add([negG1x, negG1y , G1PointC[i][0], G1PointC[i][1]]);
+            G1PointV[i] = bn128_add([negG1x, negG1y , G1PointV[i][0], G1PointV[i][1]]);
+        }
+        G1PointU = bn128_add([negG1x, negG1y, G1PointU[0], G1PointU[1]]);
+        return (G1PointC, G1PointV, G1PointU);
+    }
+
+
+    function ReturnPointC() public returns(uint[2][] memory)
+    {
+        uint elements = G1PointC.length;
+        for (uint i = 0; i < elements; i++)
+        {
+            G1PointC[i] = bn128_add([negG1x, negG1y , G1PointC[i][0], G1PointC[i][1]]);
+        }
+        return G1PointC;
+    }
+
+    function Aggregate(uint256[] memory  c1 , uint256[] memory c2, uint256[] memory v1, uint256[] memory v2, uint256 U1, uint256 U2)
+    public
+    {
+        uint elements = c1.length;  //get array length
+        for(uint i=0; i<elements; i++)
+        {
+            G1PointC[i]=bn128_add([c1[i], c2[i], G1PointC[i][0], G1PointC[i][1]]);
+            G1PointV[i]=bn128_add([v1[i], v2[i], G1PointV[i][0], G1PointV[i][1]]);
+        }
+        G1PointU=bn128_add([U1,U2,G1PointU[0],G1PointU[1]]);
+    }
 
     function P1() pure internal returns (G1Point memory) {
 	    return G1Point(1, 2);
@@ -58,12 +108,20 @@ contract DAOsForVote {
 		);
 	}
 
+    	/// return the negation of p, i.e. p.add(p.negate()) should be zero.
+	function G1neg(uint256 p) pure internal returns (uint r) {
+		// The prime q in the base field F_q for G1
+		uint256 q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+            r = (q - (p % q));
+	}
+
+
     function pk_I() pure internal returns (G2Point memory) {
 		return G2Point(
-			[15096605074003995872750883394963702041916000941872390680259053896009096470112,
-            20331578033341841693410649242917063727105965400640207949509279929227010480456],
-			[15189645098168318130768182149190091933949431152809108290229108995865581338569,
-            2923532663452579377027690794143952696033614311423691797654954568321831627808]
+			[410331679793378253270676581922857325978420412939832091293874594317968404676,
+            18763800358864019000552773440545754218678238064612111471382832602429099653153],
+			[15498345051290780549250954827254971939745244621482817595357857072172484368730,
+            18428974775939053033653030813069583546036508418472013925185079794649562797187]
 		);
 	}
 
@@ -175,6 +233,7 @@ contract DAOsForVote {
         proof_is_valid = challenge == proof[0];
     }
 
+    /*
     function ZKRP_verify(
         uint256[2] memory E_j, uint256[2] memory F_j1, uint256[2] memory F_j2,
         uint256[2] memory U1_j, uint256[2] memory C1_j,
@@ -188,47 +247,49 @@ contract DAOsForVote {
         proof1 = ZKRP_verify1(C1_j, C_j, c, z3);
         proof2 = ZKRP_verify2(U1_j, U_j, c, z3, z1);
         //proof3 = ZKRP_verify3(F_j1, F_j2, E_j, c, z1, z2); //c, z1, z2, pk_I
-        //proof_is_valid = proof1 && proof2; 
+        //proof_is_valid = proof1 && proof2;
     }
-    
+    */
+
     function  Interpolate(
-        uint256[2][] memory V, uint256[] memory lagrange_coefficient
+        uint256[2][] memory V, uint256[] memory lagrange_coefficient, uint256 G1X, uint G1Y
     )
     public returns (uint256[2] memory)
     {
         uint256[2] memory a1; //acc=g
         uint256[2] memory temp;
-        a1[0] = H1x;
-        a1[1] = H1y;
-        uint elements=lagrange_coefficient.length;//to get the array length 
+        a1[0] = G1X;
+        a1[1] = G1Y;
+        uint elements=lagrange_coefficient.length;//to get the array length
         for(uint i=0;i<elements;i++)
         {
             temp = bn128_multiply([V[i][0], V[i][1],lagrange_coefficient[i]]);
             a1 = bn128_add([a1[0], a1[1], temp[0], temp[1]]);
         }
-        a1=bn128_add([a1[0], a1[1], 1368015179489954701390400359078579693043519447331113978918064868415326638035, 11970132820537103637166003141937572314130795164147247315533067598634108082819]); // add neg(H1)
+        a1=bn128_add([a1[0], a1[1], G1X, G1neg(G1Y)]); // add neg(H1)
         return a1;
     }
-    
+
+
     function ZKRP_verify1(
-        uint256[2][] memory V, uint256[] memory lagrange_coefficient,
+        uint256[2][] memory V, uint256[] memory lagrange_coefficient, uint256[2] memory C1_j,
         uint256 c, uint256 z3
     )
     public returns (bool proof_is_valid)
     {
-        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient);
+        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient, H1x, H1y);
         uint256[2] memory temp;
         uint256[2] memory temp2;
         uint256[2] memory temp3;
         temp2 = bn128_multiply([C_j[0], C_j[1], c]);  // NEED C_j to  Interpolate
         temp3 = bn128_multiply([H1x, H1y, z3]);
         temp = bn128_add([temp2[0], temp2[1], temp3[0], temp3[1]]);
-        proof_is_valid = C_j[0] == temp[0] && C_j[1] == temp[1];    
+        proof_is_valid = C1_j[0] == temp[0] && C1_j[1] == temp[1];
     }
 
     function ZKRP_verify2(
         uint256[2] memory U1_j, uint256[2] memory U_j,
-        uint256 c, uint256 z3, uint256 z1
+        uint256 c, uint256 z1, uint256 z3
     )
     public returns (bool proof_is_valid)
     {
@@ -245,7 +306,7 @@ contract DAOsForVote {
         temp = bn128_add([temp2[0], temp2[1], temp3[0], temp3[1]]);
         temp = bn128_add([temp[0], temp[1], temp4[0],temp4[1]]);
         proof_is_valid=U1_j[0] == temp[0] && U1_j[1] == temp[1];
-        
+
     }
 
     function ZKRP_verify3(
@@ -265,7 +326,7 @@ contract DAOsForVote {
         temp2 = bn128_multiply([E_j[0], E_j[1], (GROUP_ORDER-z1)]);
         temp3 = bn128_multiply([1, 2, z2]);
         //数据转换在这里
-        
+
         p1[0].X = F_j1[0];
         p1[0].Y = F_j1[1];
 
@@ -286,38 +347,24 @@ contract DAOsForVote {
         p2[1] = P2();
         p2[2] = pk_I();
         p2[3] = P2();
-        p2[4] = P2(); 
-        
-		return pairing(p1, p2);	
-            
+        p2[4] = P2();
+
+		return pairing(p1, p2);
+
     }
 
-    function pairingtest(
-        uint256[2] memory F_j1, uint256[2] memory F_j2
-    ) 
-    public  returns (bool)
+
+
+    function Tally(
+        uint256[2][] memory C, uint256[] memory lagrange_coefficient
+    )
+    public returns(uint256[2] memory)
     {
-        G1Point[] memory p1 = new G1Point[](5);
-		G2Point[] memory p2 = new G2Point[](5);
-        /*
-        p1[0]=P1();
-        p1[1]=P1();
-        p1[1].Y = 21888242871839275222246405745257275088696311157297823662689037894645226208581;
-        */
-        p1[0].X = F_j1[0];
-        p1[0].Y = F_j1[1];
-        p1[1].X = F_j2[0];
-        p1[1].Y = F_j2[1];
-        p1[2] = P1();
-        p1[3] = P1();
-        p1[4] = P1();
-
-
-        p2[0]=P2();
-        p2[1]=pk_I();
-        p2[2]=P2();
-        p2[3]=P2();
-        p2[4]=P2();
-        return pairing(p1,p2);
+        uint256[2] memory G1ACC;
+        G1ACC =  Interpolate(C, lagrange_coefficient, G1x, G1y);
+        G1ACC =  bn128_add([G1PointU[0], G1PointU[1], G1ACC[0], G1neg(G1ACC[1])]);
+        G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
+        return G1ACC;
     }
+
 }
