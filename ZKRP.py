@@ -5,7 +5,7 @@ from solcx import compile_standard, install_solc
 
 install_solc("0.8.0")
 import json  # to save the output in a JSON file
-import PVSS
+import PVSS2
 import time
 import re
 import sympy  # Needed for mod_inverse
@@ -15,9 +15,6 @@ from py_ecc.bn128 import add, multiply, neg, pairing, is_on_curve
 from py_ecc.bn128 import curve_order as CURVE_ORDER
 from py_ecc.bn128 import field_modulus as FIELD_MODULUS
 
-global pk, sk, n, t
-n = 10  # tally_people /Registered Tallier
-t = 5  # The voting system need tallier to recover secret
 H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)
 keccak_256 = Web3.solidityKeccak
 
@@ -79,10 +76,10 @@ def Setup(a, b):
 
 
 def Prove(s_j, w_j, U_j, sigma_wj):
-    v = PVSS.random_scalar()
-    s = PVSS.random_scalar()
-    t = PVSS.random_scalar()
-    m = PVSS.random_scalar()
+    v = PVSS2.random_scalar()
+    s = PVSS2.random_scalar()
+    t = PVSS2.random_scalar()
+    m = PVSS2.random_scalar()
     # m1 = PVSS.random_scalar()
 
     E_j = multiply(sigma_wj, v)
@@ -148,14 +145,14 @@ def Verify(proof, V_j, U_j, s_j, pk_I):
     return 1
 
 
-def ZKRP_verify(proof, V_j, lagrangeCoefficient, U_j):
+def ZKRP_verify(proof, V_j, lagrangeCoefficient, U_j, n, t):
     def IntsTransform(x):  # tuple/list transform to int[]
         ints = [int(num) for num in x]
         return ints
 
     vv = []
     for i in range(0, n):
-        temp = PVSS.IntsTransform(V_j[i])
+        temp = PVSS2.IntsTransform(V_j[i])
         vv.extend([temp])
 
     result1 = Contract.functions.ZKRP_verify1(vv, lagrangeCoefficient, IntsTransform(proof[4]), proof[5],
@@ -167,5 +164,19 @@ def ZKRP_verify(proof, V_j, lagrangeCoefficient, U_j):
 
     return result1, result2, result3
 
+
+"""
+GPK=Setup(1,5)
+#print(GPK["sigam_k"][0])
+s_j=1
+
+w_j=1
+U_j=add(multiply(H1,w_j), multiply(G1,s_j))
+
+for i in range(1,30):
+    starttime=time.time() #time test
+    proof = Prove1(s_j,w_j,U_j,GPK["sigam_k"][0])
+    print("PVSS.Share times  cost: ",time.time()- starttime ,"s")  #time test
+"""
 
 

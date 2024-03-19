@@ -16,7 +16,7 @@ import sys
 import time
 import ZKRP
 import PVSS
-import VoteforDAOs
+
 from py_ecc.bn128 import G1, G2
 from py_ecc.bn128 import add, multiply, neg, pairing, is_on_curve
 from py_ecc.bn128 import curve_order as CURVE_ORDER
@@ -68,40 +68,48 @@ pk_I = multiply(G2, sk_I)
 H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)
 
 
-def Vote(w_j: int):  # vote value
+def Vote(w_j: int, n: int, t: int):  # vote value
     s_j = PVSS.random_scalar()
-    shares = PVSS.Share(s_j, H1, pk)
+    # starttime=time.time() #time test
+    shares = PVSS.Share2(s_j, H1, pk, n, t)
+    # print("PVSS.Share ",PVSS.n,"times  cost: ",time.time()- starttime ,"s")  #time test
 
     U_j = add(multiply(H1, w_j), multiply(G1, s_j))
-    proof = ZKRP.Prove(s_j, w_j, U_j, GPK["sigam_k"][(w_j - 1) % 5])
+    proof = ZKRP.Prove(s_j, w_j, U_j, GPK["sigam_k"][(w_j - 1) % b])
 
-    return {"v": shares["v"], "c": shares["c"], "U": U_j, "Proof": proof, "raw": shares["raw"]}
+    dleq_proof = []
+    for i in range(0, n):
+        temp = PVSS.IntsTransform(shares["DLEQ_Proof"][i])
+        dleq_proof.extend([temp])
+
+    agg = PVSS.Dateconvert(shares, n)  # Data transformation
+    Contract.functions.PVSStoSC(agg["c1"], agg["c2"], agg["v1"], agg["v2"], int(U_j[0]), int(U_j[1]),
+                                dleq_proof).transact({'from': w3.eth.accounts[0]})
+    print("Vote done")
 
 
-def VoteVerify(shares):
-    SS = PVSS.DVerify(H1, shares["v"], pk, shares["c"], shares["raw"])
+def VoteVerify(shares, n, t):
+    SS = PVSS.DVerify(H1, shares["v"], pk, shares["c"], shares["raw"], n, t)
 
-    result = ZKRP.ZKRP_verify(shares["Proof"], shares["v"], PVSS.LagrangeCoefficient(shares["raw"]), shares["U"])
+    result = ZKRP.ZKRP_verify(shares["Proof"], shares["v"], PVSS.LagrangeCoefficient(shares["raw"]), shares["U"], n, t)
     print("PVSS DVerify Result:" + str(SS))
     print("ZKRP Verify Result:" + str(result))
 
 
-def TallierVerify(shares):
-    SS = PVSS.PVerify(G1, pk, shares, ReturnPointC(), sk)
+def TallierVerify(shares, n, t):
+    SS = PVSS.PVerify(G1, pk, shares, ReturnPointC(), sk, n, t)
     print("PVSS PVerify Result:" + str(SS))
 
 
-def Aggreagate(shares):
-    agg = PVSS.Dateconvert(shares)
-    Contract.functions.Aggregate(agg["c1"], agg["c2"], agg["v1"], agg["v2"], int(shares["U"][0]),
-                                 int(shares["U"][1])).transact({'from': w3.eth.accounts[0]})
+def Aggreagate():
+    Contract.functions.Aggregate().transact({'from': w3.eth.accounts[0]})
+
     print("Aggregate done.")
-    return 1
 
 
-def Tally(sh1_j, lar):
+def Tally(sh1_j, lar, n, t, m):
     res_list = [[int(x) for x in tup] for tup in sh1_j]
-    result = Contract.functions.Tally(res_list, lar).call()
+    result = Contract.functions.Tally(res_list, lar, t).call()
     AllResult = []
     for i in range(a * m, b * m + 1):
         AllResult.extend([multiply(H1, i)])
@@ -109,6 +117,7 @@ def Tally(sh1_j, lar):
     for i in range(0, (b - a) * m + 1):
         if (result[0] == AllResult[i][0] and result[1] == AllResult[i][1]):
             print("The vote score is " + str(i + a * m))
+
     return result
 
 
@@ -125,43 +134,47 @@ def ReturnPointC():
     return formatted_data
 
 
-def Init(n: int):
-    Contract.functions.Init(n).transact({'from': w3.eth.accounts[0]})
-    # print("............................Init Done ...............................")
-
-
-def VoteAgg(x):  # Multiple voters are selected to vote at once
-    for i in range(0, x):
-        Vote1 = Vote(4)
-        VoteVerify(Vote1)
-        Aggreagate(Vote1)
-
-
 if __name__ == '__main__':
     print("...........................................Setup phase.............................................")
-    Init(PVSS.n)
-    key = PVSS.Setup()  # PVSS Key Generation
+
+    n = 10
+    t = 5
+
+    ReturnDate()
+
+    # starttime=time.time() #time test
+    key = PVSS.Setup(n, t)  # PVSS Key Generation
+
+    # print("PVSS.Setup "+"times  cost: ",time.time()- starttime ,"s")  #time test
+    # print("The size of the {2,1}  V: "+str(len(str(key))))
     # pvss setup
     pk = key["pk"]  # Public key array
     sk = key["sk"]  # Private key array
 
     a = 1
     b = 5
-    m = 10
+    m = 1
     GPK = ZKRP.Setup(a, b)
 
     print("............................................Voting phase...........................................")
-    VoteAgg(10)
-    Vote11 = Vote(4)
-    VoteVerify(Vote11)
-    Aggreagate(Vote11)
+    # VoteAgg(10,n,t)
 
+    Vote(4, n, t)
+
+    Aggreagate()
+
+    ReturnDate()
+    # Aggreagate(Vote11,n,t)
+    # VoteVerify(Vote11,n,t)
+    # print("The size of the {2,1}  V: "+str(len(str(Vote11["v"]+Vote11["c"]))))
+
+    """
     print("..........................................tallying phase...........................................")
-    sh1 = PVSS.DecryptShares(ReturnPointC(), sk)
+    sh1=PVSS.DecryptShares(ReturnPointC(),sk,n,t)
 
-    TallierVerify(sh1)
-
-    Tally(sh1, PVSS.LagrangeCoefficient(Vote11["raw"]))
+    TallierVerify(sh1,n,t)
+    print(sh1)
+    Tally(sh1,PVSS.LagrangeCoefficient(Vote11["raw"]),n,n,m)
 
     print("............................................Reward phase...........................................")
-
+    """

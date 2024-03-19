@@ -28,6 +28,7 @@ contract DAOsForVote {
     uint256 constant G2yx = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
     uint256 constant G2yy = 4082367875863433681332203403145435568316851327593401208105741076214120093531;
 
+    uint256 constant Tallires = 30;    //取消Init函数，需要提前设置唱票者人数，生成对应的存储空间
 
     struct G1Point {
 		uint X;
@@ -40,66 +41,132 @@ contract DAOsForVote {
 		uint[2] Y;
 	}
 
-    uint256[2]   G1PointU;
-    uint256[2][] G1PointC;
-    uint256[2][] G1PointV;
-
-    function Init(uint elements) public
-    {
-
-        uint256[2] memory G1Point;
-        G1Point=[G1x,G1y];   // Initialize G1Point
-        G1PointU=[1,2];
+    uint256[2][] Tallires_pk;
 
 
-        //G1Point[] memory g1points= new G1Point[](elements);
+    uint256[2]   AGGPointU;   //存储Aggregate之后的数据U*
+    uint256[2][] AGGPointC;   //存储Aggregate之后的数据C*
+    uint256[2][] AGGPointV;   //存储Aggregate之后的数据V*
 
-        for (uint i = 0; i < elements; i++) {
-            uint256[2] memory newStruct = G1Point;
-            G1PointC.push(newStruct);
-            G1PointV.push(newStruct);
+    constructor() {
+        AGGPointU = [0,0]; // 在构造函数中为该数组赋值
+        uint256[2] memory temp;
+        temp[0]=0;
+        temp[1]=0;   // Initialize G1Point
+
+        //构造函数，生成Tallires所需的存储空间
+
+        for (uint i = 0; i < Tallires; i++) {
+            uint256[2] memory newStruct = temp;
+            AGGPointC.push(newStruct);
+            AGGPointV.push(newStruct);
         }
     }
 
+
+    struct Vote_Data
+    {
+        uint256[]  c1;
+        uint256[]  c2;
+        uint256[]  v1;
+        uint256[]  v2;
+        uint256 U1;
+        uint256 U2;
+        uint256[2][] D_Proof;
+        //uint256[2][] P_Proof;
+        //uint256[]  lagrangeCoefficient;
+    }
+
+    struct ZKRP_Proof
+    {
+        uint256[2] E_j;
+        uint256[2] F_j1;
+        uint256[2] F_j2;
+        uint256[2] U1_j;
+        uint256[2] C1_j;
+        uint256 c;
+        uint256 z1;
+        uint256 z2;
+        uint256 z3;
+    }
+
+    Vote_Data public VoteData;   //生成实例
+    ZKRP_Proof public ZKRPProof;
+
+    function PVSStoSC(uint256[] memory  _c1 , uint256[] memory _c2, uint256[] memory _v1, uint256[] memory _v2, uint256 _U1, uint256 _U2, uint256[2][] memory _D_Proof)
+    public
+    {   // 实例化结构体并赋值
+
+        VoteData = Vote_Data({
+            c1: _c1,
+            c2: _c2,
+            v1: _v1,
+            v2: _v2,
+            U1: _U1,
+            U2: _U2,
+            D_Proof: _D_Proof
+            //lagrangeCoefficient: _lagrangeCoefficient  , uint256[] memory _lagrangeCoefficient
+        });
+
+
+    }
+
+    function ZKRPtoSC(
+        uint256[2] memory _E_j,
+        uint256[2] memory _F_j1,
+        uint256[2] memory _F_j2,
+        uint256[2] memory _U1_j,
+        uint256[2] memory _C1_j,
+        uint256 _c,
+        uint256 _z1,
+        uint256 _z2,
+        uint256 _z3
+    ) public { //ZKRP Proof 赋值
+        ZKRPProof = ZKRP_Proof({
+            E_j: _E_j,
+            F_j1: _F_j1,
+            F_j2: _F_j2,
+            U1_j: _U1_j,
+            C1_j: _C1_j,
+            c: _c,
+            z1: _z1,
+            z2: _z2,
+            z3: _z3
+        });
+    }
+
+    function PK_Setup(uint256[2][] memory pk) public
+    {
+        Tallires_pk = pk;
+    }
+
     function ReturnData() public  returns (uint256[2][] memory, uint256[2][] memory, uint256[2] memory) {
-        uint elements = G1PointC.length;
-        for (uint i = 0; i < elements; i++)
-        {
-            G1PointC[i] = bn128_add([negG1x, negG1y , G1PointC[i][0], G1PointC[i][1]]);
-            G1PointV[i] = bn128_add([negG1x, negG1y , G1PointV[i][0], G1PointV[i][1]]);
-        }
-        G1PointU = bn128_add([negG1x, negG1y, G1PointU[0], G1PointU[1]]);
-        return (G1PointC, G1PointV, G1PointU);
+        return (AGGPointC, AGGPointV, AGGPointU);
     }
 
 
     function ReturnPointC() public returns(uint[2][] memory)
     {
-        uint elements = G1PointC.length;
-        for (uint i = 0; i < elements; i++)
-        {
-            G1PointC[i] = bn128_add([negG1x, negG1y , G1PointC[i][0], G1PointC[i][1]]);
-        }
-        return G1PointC;
+        return AGGPointC;
     }
 
-    function Aggregate(uint256[] memory  c1 , uint256[] memory c2, uint256[] memory v1, uint256[] memory v2, uint256 U1, uint256 U2)
+    function Aggregate()
     public
     {
-        uint elements = c1.length;  //get array length
+        uint elements = VoteData.c1.length;  //get array length
         for(uint i=0; i<elements; i++)
         {
-            G1PointC[i]=bn128_add([c1[i], c2[i], G1PointC[i][0], G1PointC[i][1]]);
-            G1PointV[i]=bn128_add([v1[i], v2[i], G1PointV[i][0], G1PointV[i][1]]);
+            AGGPointC[i]=bn128_add([VoteData.c1[i], VoteData.c2[i], AGGPointC[i][0], AGGPointC[i][1]]);
+            AGGPointV[i]=bn128_add([VoteData.v1[i], VoteData.v2[i], AGGPointV[i][0], AGGPointV[i][1]]);
         }
-        G1PointU=bn128_add([U1,U2,G1PointU[0],G1PointU[1]]);
+        AGGPointU=bn128_add([VoteData.U1,VoteData.U2,AGGPointU[0],AGGPointU[1]]);
     }
 
     function P1() pure internal returns (G1Point memory) {
 	    return G1Point(1, 2);
 	}
 
-   function P2() pure internal returns (G2Point memory) {
+    function P2() pure internal returns (G2Point memory) {
 		return G2Point(
 			[11559732032986387107991004021392285783925812861821192530917403151452391805634,
 			 10857046999023057135944570762232829481370756359578518086990519993285655852781],
@@ -194,22 +261,27 @@ contract DAOsForVote {
 		return out[0] != 0;
 	}
 
-    function bn128_check_pairing(uint256[12] memory input)
-    public returns (bool) {
-        uint256[1] memory result;
-        bool success;
-        assembly {
-            // 0x08     id of precompiled bn256Pairing contract     (checking the elliptic curve pairings)
-            // 0        number of ether to transfer
-            // 384       size of call parameters, i.e. 12*256 bits == 384 bytes
-            // 32        size of result (one 32 byte boolean!)
-            success := call(sub(gas(), 2000), 0x08, 0, input, 384, result, 32)
+    function PVSS_DVerify() public returns(bool)
+    {
+
+        uint elements = VoteData.c1.length;  //get array length
+        for (uint i = 0; i < elements; i++)
+        {
+
+            if(!DLEQ_verify([H1x,H1y],[VoteData.v1[i], VoteData.v2[i]],[Tallires_pk[i][0],Tallires_pk[i][1]],[VoteData.c1[i], VoteData.c2[i]],[VoteData.D_Proof[i][0],VoteData.D_Proof[i][1]]))
+            {
+                return false;
+            }
         }
-        require(success, "elliptic curve pairing failed");
-        return result[0] == 1;
+
+        return true;
     }
 
 
+    function PVSS_PVerify() public returns(bool)
+    {
+
+    }
 
     function DLEQ_verify(
         uint256[2] memory x1, uint256[2] memory y1,
@@ -252,7 +324,7 @@ contract DAOsForVote {
     */
 
     function  Interpolate(
-        uint256[2][] memory V, uint256[] memory lagrange_coefficient, uint256 G1X, uint G1Y
+        uint256[2][] memory V, uint256[] memory lagrange_coefficient, uint256 G1X, uint G1Y, uint t
     )
     public returns (uint256[2] memory)
     {
@@ -260,7 +332,8 @@ contract DAOsForVote {
         uint256[2] memory temp;
         a1[0] = G1X;
         a1[1] = G1Y;
-        uint elements=lagrange_coefficient.length;//to get the array length
+        //uint elements=lagrange_coefficient.length;//to get the array length
+        uint elements=t;
         for(uint i=0;i<elements;i++)
         {
             temp = bn128_multiply([V[i][0], V[i][1],lagrange_coefficient[i]]);
@@ -277,7 +350,8 @@ contract DAOsForVote {
     )
     public returns (bool proof_is_valid)
     {
-        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient, H1x, H1y);
+        uint elements=lagrange_coefficient.length;
+        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient, H1x, H1y,elements);
         uint256[2] memory temp;
         uint256[2] memory temp2;
         uint256[2] memory temp3;
@@ -325,7 +399,6 @@ contract DAOsForVote {
         temp1 = bn128_multiply([E_j[0], E_j[1], c]);
         temp2 = bn128_multiply([E_j[0], E_j[1], (GROUP_ORDER-z1)]);
         temp3 = bn128_multiply([1, 2, z2]);
-        //数据转换在这里
 
         p1[0].X = F_j1[0];
         p1[0].Y = F_j1[1];
@@ -352,19 +425,17 @@ contract DAOsForVote {
 		return pairing(p1, p2);
 
     }
-
-
-
+    /*
     function Tally(
-        uint256[2][] memory C, uint256[] memory lagrange_coefficient
+        uint256[2][] memory C, uint256[] memory lagrange_coefficient, uint t
     )
     public returns(uint256[2] memory)
     {
         uint256[2] memory G1ACC;
-        G1ACC =  Interpolate(C, lagrange_coefficient, G1x, G1y);
+        G1ACC =  Interpolate(C, lagrange_coefficient, G1x, G1y, t);
         G1ACC =  bn128_add([G1PointU[0], G1PointU[1], G1ACC[0], G1neg(G1ACC[1])]);
         G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
-
+    */
 }
