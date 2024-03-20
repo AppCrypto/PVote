@@ -121,7 +121,7 @@ def Verify(proof, V_j, U_j, s_j, pk_I):  #ZKRP的链下验证，为测试所用
 
 
 def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
-    def IntsTransform(x):  # tuple/list transform to int[]
+    def Point2IntArr(x):  # tuple/list transform to int[]
         ints = [int(num) for num in x]   #格式转换，转换成int数组，方便传入链上
         return ints
 
@@ -138,7 +138,7 @@ def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
         return result
 
     lar = [lagrange_coefficient(i) for i in recIndex]   #转换为int[]
-    V = [IntsTransform(V_j[i]) for i in recIndex]  #转换为uint256[2][]
+    V = [Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
     result1 = Contract.functions.ZKRP_verify1(V, lar).call() #ZKRP.Verify的第一个等式的验证
     result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
     result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证

@@ -67,7 +67,7 @@ def random_scalar() -> int:  # Generate random numbers
     return secrets.randbelow(CURVE_ORDER)
 
 
-def IntsTransform(x):  # tuple/list transform to int[]
+def Point2IntArr(x):  # tuple/list transform to int[]
     ints = [int(num) for num in x]  #数据转换
     return ints
 
