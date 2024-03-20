@@ -61,10 +61,6 @@ contract_address = transaction_receipt['contractAddress']
 # print("合约已部署，地址：", contract_address)
 Contract = w3.eth.contract(address=contract_address, abi=abi)
 
-global pk, sk
-sk = []
-pk = []
-
 keccak_256 = Web3.solidityKeccak
 """
 H0=(9727523064272218541460723335320998459488975639302513747055235660443850046724,5031696974169251245229961296941447383441169981934237515842977230762345915487)
@@ -90,9 +86,11 @@ def Setup(n, t):  # PVSS Key Generation
         This key is used for deriving the encryption keys used to secure the shares.
         This is NOT a BLS key pair used for signing messages.
     """
-    global sk, pk
+    sk = []
+    pk = []
     sk.extend([random_scalar() for i in range(0, n)])
     pk.extend([multiply(G1, sk[i]) for i in range(0, n)])  # only need 1-n
+
     return {"pk": pk, "sk": sk}
 
 
@@ -109,33 +107,55 @@ def share_secret(secret: int, sharenum: int, threshold: int) -> Dict[
 
     indices = [i for i in range(1, sharenum + 1)]
     shares = {x: f(x) for x in indices}
-
-    # coefficients = [secret] + [random_scalar() for j in range(threshold-1)]
-    # #The polynomial coefficients
-    # def f(x: int) -> int:
-    #     """ evaluation function for secret polynomial
-    #     """
-    #     return (
-    #         sum(coef * pow(x, j, CURVE_ORDER) for j, coef in enumerate(coefficients)) % CURVE_ORDER
-    #     )
-    # shares = { x:f(x) for x in range(1,sharenum+1)}
-    # print(indices,shares,[multiply(H1, shares[i]) for i in indices])
     return shares
 
 
 def Dateconvert(res, n):  # Data conversion functions for bilinear pairing on-chain
-    c1 = []
-    c2 = []
+    c1 = [0]
+    c2 = [0]
 
-    v1 = []
-    v2 = []
+    v1 = [0]
+    v2 = [0]
 
-    c1.extend(int(res["c"][i][0]) for i in range(0, n))
-    c2.extend(int(res["c"][i][1]) for i in range(0, n))
-    v1.extend(int(res["v"][i][0]) for i in range(0, n))
-    v2.extend(int(res["v"][i][1]) for i in range(0, n))
-
+    c1.extend(int(res["c"][i][0]) for i in range(1, n + 1))
+    c2.extend(int(res["c"][i][1]) for i in range(1, n + 1))
+    v1.extend(int(res["v"][i][0]) for i in range(1, n + 1))
+    v2.extend(int(res["v"][i][1]) for i in range(1, n + 1))
     return {"c1": c1, "c2": c2, "v1": v1, "v2": v2}  # c1 is x of c, c2 is y of c. And v1,v2,s1,s2 so on...
+
+
+def Share2(s_j, H1, pk, n, t):
+    PVSSshare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
+    print(PVSSshare)
+    v = []
+    c = []
+    DLEQ_Proof = []
+    """
+    print(PVSSshare)
+    for i in range(0,n):
+        print(PVSSshare[i+1])
+        tmp=multiply(G1,PVSSshare[i+1])
+        v.extend(tmp)
+    """
+    v.extend([multiply(H1, PVSSshare[i + 1]) for i in range(0, n)])  # v_i=g2^s_i
+    c.extend([multiply(pk[i], PVSSshare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
+    DLEQ_Proof.extend([DLEQ(H1, v[i], pk[i], c[i], PVSSshare[i + 1]) for i in range(0, n)])
+    res = {"v": v, "c": c, "DLEQ_Proof": DLEQ_Proof}
+    return res
+
+
+def Share(s_j, H1, pk, n, t):
+    SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
+    print(SSShare)
+    v = [0]
+    c = [0]
+    DLEQ_Proof = [0]
+    v.extend([multiply(H1, SSShare[i + 1]) for i in range(0, n)])  # v_i=g2^s_i
+    c.extend([multiply(pk[i], SSShare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
+
+    DLEQ_Proof.extend([DLEQ(H1, v[i + 1], pk[i], c[i + 1], SSShare[i + 1]) for i in range(0, n)])
+    res = {"v": v, "c": c, "DLEQ_Proof": DLEQ_Proof}
+    return res
 
 
 def DLEQ(x1, y1, x2, y2, alpha: int) -> Tuple[int, int]:
@@ -217,118 +237,47 @@ def PVerify(g0, pk, sh1_j, C_j, sk, n, t):
     return 1
 
 
-def Share(s_j, H1, pk, n, t):
-    SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
-    v = [0]
-    c = [0]
-
-    v.extend([multiply(H1, SSShare[i + 1]) for i in range(0, n)])  # v_i=g2^s_i
-    c.extend([multiply(pk[i], SSShare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
-    res = {"v": v, "c": c, "raw": SSShare, "s": s_j}
-    # print(SSShare)
-    return res
-
-
 def Reconstruct(res, n, t):
-    # print(res)
+    recIndex = [i + 1 for i in range(0, t + 1)]
+    # print(recIndex)
     sum = multiply(H1, 0)
 
     def lagrange_coefficient(i: int) -> int:
         result = 1
-        for j in res["raw"]:
+        for j in recIndex:
+            # print(j)
             # j=j-1
             if i != j:
                 result *= j * sympy.mod_inverse((j - i) % CURVE_ORDER, CURVE_ORDER)
                 result %= CURVE_ORDER
         return result
 
-    # print(res["raw"].items())
-    for i, _ in res["raw"].items():
-        # print(i)
+    for i in recIndex:
+        # print("i",i)
         sum = add(sum, multiply(res["v"][i], lagrange_coefficient(i)))
-        # print(lagrange_coefficient(i))
-
     return sum
 
 
-def Reconstruct2(share, n, t):
-    res_list = [[int(x) for x in tup] for tup in share["v"]]
-    # print(res_list)
-    # print(share["v"])
-    result = Contract.functions.Interpolate(res_list, LagrangeCoefficient(share["raw"]), int(H1[0]), int(H1[1]),
-                                            t).call()
-    return result
-
-
-def Share2(s_j, H1, pk, n, t):
-    PVSSshare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
-    v = []
-    c = []
-    DLEQ_Proof = []
-    """
-    print(PVSSshare)
-    for i in range(0,n):
-        print(PVSSshare[i+1])
-        tmp=multiply(G1,PVSSshare[i+1])
-        v.extend(tmp)
-    """
-    v.extend([multiply(H1, PVSSshare[i + 1]) for i in range(0, n)])  # v_i=g2^s_i
-    c.extend([multiply(pk[i], PVSSshare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
-    DLEQ_Proof.extend([DLEQ(H1, v[i], pk[i], c[i], PVSSshare[i + 1]) for i in range(0, n)])
-    res = {"v": v, "c": c, "DLEQ_Proof": DLEQ_Proof}
-    return res
-
-
 if __name__ == '__main__':
+    key = Setup(10, 5)
+
     n = 10
     t = 5
-    s = 233333
-    key = Setup(n, t)
-
     print("answer")
-    print(multiply(H1, s))
+    print(multiply(H1, 233333))
     print(".........")
-    share1 = Share(s, H1, pk, n, t)
-    # print(share1)
-    sum = Reconstruct(share1, n, t)
+
+    res1 = Share(233333, H1, key["pk"], n, t)
+    res2 = Share2(233333, H1, key["pk"], n, t)
+    # print(res1)
+    # print(res2)
+    sum = Reconstruct(res1, 10, 6)
     print(sum)
 
-    # res=Reconstruct2(share1,2,1)
+    # res=Reconstruct2(share1,10,10)
     # print(res)
 
-"""
-print(key)
-print(pk)
-print(sk)
-print(G1)
-print(type(G1))
-print(H0)
-print(is_on_curve(H0,FQ(3)))    
-shares=Share(random_scalar(),H0,pk)
-print(shares)
+    # print(LagrangeCoefficient(share1["raw"]))
 
 
-y1=multiply(G1,shares["s"])
-y2=multiply(H0,shares["s"])
-
-proof1=DLEQ(H0,shares["v"][0],pk[0],shares["c"][0],shares["raw"][1])
-print(DLEQ_verify(H0,shares["v"][0],pk[0],shares["c"][0],proof1[0],proof1[1]))
-
-result=Contract.functions.DLEQ_verify(IntsTransform(H0),IntsTransform(shares["v"][0]),IntsTransform(pk[0]),IntsTransform(shares["c"][0]),IntsTransform(proof1)).call()
-if(result==True):
-    print("ok")
-"""
-
-"""
-starttime = time.time()
-SS=DVerify(H0,shares["v"],pk,shares["c"],shares["raw"])
-print("SCRAPE DDH verification cost ",time.time()- starttime)    
-print(SS)
-
-
-sh1_j=DecryptShares(shares["c"],sk)
-SS=PVerify(G1,pk,sh1_j,shares["c"],sk)
-print(SS)
-
-"""
 

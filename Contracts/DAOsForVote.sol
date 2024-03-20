@@ -41,12 +41,13 @@ contract DAOsForVote {
 		uint[2] Y;
 	}
 
-    uint256[2][] Tallires_pk;
+
 
 
     uint256[2]   AGGPointU;   //存储Aggregate之后的数据U*
     uint256[2][] AGGPointC;   //存储Aggregate之后的数据C*
     uint256[2][] AGGPointV;   //存储Aggregate之后的数据V*
+    uint256[2][] Tallires_pk;
 
     constructor() {
         AGGPointU = [0,0]; // 在构造函数中为该数组赋值
@@ -135,9 +136,18 @@ contract DAOsForVote {
         });
     }
 
-    function PK_Setup(uint256[2][] memory pk) public
-    {
+    function setTalliresPK(uint256[2][] memory pk) public {
         Tallires_pk = pk;
+    }
+
+    function DownloadAGGVC(uint No) public returns (uint256[2] memory, uint256[2] memory)
+    {
+        return (AGGPointC[No],AGGPointV[No]);
+    }
+
+    function ReturnPKi(uint i) public returns(uint256[2] memory)
+    {
+        return Tallires_pk[i];
     }
 
     function ReturnData() public  returns (uint256[2][] memory, uint256[2][] memory, uint256[2] memory) {
@@ -154,7 +164,7 @@ contract DAOsForVote {
     public
     {
         uint elements = VoteData.c1.length;  //get array length
-        for(uint i=0; i<elements; i++)
+        for(uint i=1; i<elements; i++)
         {
             AGGPointC[i]=bn128_add([VoteData.c1[i], VoteData.c2[i], AGGPointC[i][0], AGGPointC[i][1]]);
             AGGPointV[i]=bn128_add([VoteData.v1[i], VoteData.v2[i], AGGPointV[i][0], AGGPointV[i][1]]);
@@ -265,10 +275,10 @@ contract DAOsForVote {
     {
 
         uint elements = VoteData.c1.length;  //get array length
-        for (uint i = 0; i < elements; i++)
+        for (uint i = 1; i < elements; i++)
         {
 
-            if(!DLEQ_verify([H1x,H1y],[VoteData.v1[i], VoteData.v2[i]],[Tallires_pk[i][0],Tallires_pk[i][1]],[VoteData.c1[i], VoteData.c2[i]],[VoteData.D_Proof[i][0],VoteData.D_Proof[i][1]]))
+            if(!DLEQ_verify([H1x,H1y],[VoteData.v1[i], VoteData.v2[i]],[Tallires_pk[i-1][0],Tallires_pk[i-1][1]],[VoteData.c1[i], VoteData.c2[i]],[VoteData.D_Proof[i][0],VoteData.D_Proof[i][1]]))
             {
                 return false;
             }

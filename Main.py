@@ -68,24 +68,36 @@ pk_I = multiply(G2, sk_I)
 H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)
 
 
-def Vote(w_j: int, n: int, t: int):  # vote value
+def Vj_Vote(w_j: int, n: int, t: int):  # vote value
     s_j = PVSS.random_scalar()
     # starttime=time.time() #time test
-    shares = PVSS.Share2(s_j, H1, pk, n, t)
+    shares = PVSS.Share(s_j, H1, pk, n, t)
     # print("PVSS.Share ",PVSS.n,"times  cost: ",time.time()- starttime ,"s")  #time test
 
     U_j = add(multiply(H1, w_j), multiply(G1, s_j))
     proof = ZKRP.Prove(s_j, w_j, U_j, GPK["sigam_k"][(w_j - 1) % b])
 
-    dleq_proof = []
-    for i in range(0, n):
+    dleq_proof = [[0, 0]]
+    for i in range(1, n + 1):
         temp = PVSS.IntsTransform(shares["DLEQ_Proof"][i])
         dleq_proof.extend([temp])
-
+    print(dleq_proof)
     agg = PVSS.Dateconvert(shares, n)  # Data transformation
+    print(agg)
     Contract.functions.PVSStoSC(agg["c1"], agg["c2"], agg["v1"], agg["v2"], int(U_j[0]), int(U_j[1]),
                                 dleq_proof).transact({'from': w3.eth.accounts[0]})
     print("Vote done")
+
+
+def Ti_Tally(No: int, sk_i):
+    aggCV = Contract.functions.DownloadAGGVC(No).call()
+    C_i = (FQ(aggCV[0][0]), FQ(aggCV[0][1]))
+    pk_i = Contract.functions.ReturnPKi.call()
+    sh1 = PVSS.Decrypt(C_i, sk_i)
+    # print(aggCV[0])
+    # print(sh1)
+
+    proof = PVSS.DLEQ(G1, pk_i, sh1, C_i, sk_i)
 
 
 def VoteVerify(shares, n, t):
@@ -134,22 +146,24 @@ def ReturnPointC():
     return formatted_data
 
 
+def ReturnPK():
+    res = Contract.functions.ReturnPK().call({'from': w3.eth.accounts[0]})
+    print(res)
+    # print("pk-onchain:"+str(res))
+
+
 if __name__ == '__main__':
     print("...........................................Setup phase.............................................")
 
     n = 10
     t = 5
 
-    ReturnDate()
-
     # starttime=time.time() #time test
     key = PVSS.Setup(n, t)  # PVSS Key Generation
-
-    # print("PVSS.Setup "+"times  cost: ",time.time()- starttime ,"s")  #time test
-    # print("The size of the {2,1}  V: "+str(len(str(key))))
-    # pvss setup
     pk = key["pk"]  # Public key array
     sk = key["sk"]  # Private key array
+    pk_onchain = [PVSS.IntsTransform(pk[i]) for i in range(n)]
+    Contract.functions.setTalliresPK(pk_onchain).transact({'from': w3.eth.accounts[0]})
 
     a = 1
     b = 5
@@ -158,23 +172,20 @@ if __name__ == '__main__':
 
     print("............................................Voting phase...........................................")
     # VoteAgg(10,n,t)
-
-    Vote(4, n, t)
-
+    # ReturnDate()
+    Vj_Vote(4, n, t)
+    print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())
     Aggreagate()
+    # ReturnDate()
 
-    ReturnDate()
-    # Aggreagate(Vote11,n,t)
-    # VoteVerify(Vote11,n,t)
-    # print("The size of the {2,1}  V: "+str(len(str(Vote11["v"]+Vote11["c"]))))
-
-    """
     print("..........................................tallying phase...........................................")
-    sh1=PVSS.DecryptShares(ReturnPointC(),sk,n,t)
+    Ti_Tally(1, sk[0])
+    # sh1=Decrypt(c_ji,sk_i)
+    # proof=DLEQ(g0,pk[i],sh1_j[i],C_j[i],sk[i])
 
-    TallierVerify(sh1,n,t)
-    print(sh1)
-    Tally(sh1,PVSS.LagrangeCoefficient(Vote11["raw"]),n,n,m)
+    # TallierVerify(sh1,n,t)
+    # print(sh1)
+    # Tally(sh1,PVSS.LagrangeCoefficient(Vote11["raw"]),n,n,m)
 
     print("............................................Reward phase...........................................")
-    """
+

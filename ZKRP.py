@@ -5,7 +5,7 @@ from solcx import compile_standard, install_solc
 
 install_solc("0.8.0")
 import json  # to save the output in a JSON file
-import PVSS2
+import PVSS
 import time
 import re
 import sympy  # Needed for mod_inverse
@@ -76,10 +76,10 @@ def Setup(a, b):
 
 
 def Prove(s_j, w_j, U_j, sigma_wj):
-    v = PVSS2.random_scalar()
-    s = PVSS2.random_scalar()
-    t = PVSS2.random_scalar()
-    m = PVSS2.random_scalar()
+    v = PVSS.random_scalar()
+    s = PVSS.random_scalar()
+    t = PVSS.random_scalar()
+    m = PVSS.random_scalar()
     # m1 = PVSS.random_scalar()
 
     E_j = multiply(sigma_wj, v)
@@ -152,7 +152,7 @@ def ZKRP_verify(proof, V_j, lagrangeCoefficient, U_j, n, t):
 
     vv = []
     for i in range(0, n):
-        temp = PVSS2.IntsTransform(V_j[i])
+        temp = PVSS.IntsTransform(V_j[i])
         vv.extend([temp])
 
     result1 = Contract.functions.ZKRP_verify1(vv, lagrangeCoefficient, IntsTransform(proof[4]), proof[5],
