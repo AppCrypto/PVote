@@ -57,17 +57,11 @@ contract_address = transaction_receipt['contractAddress']
 # print("合约已部署，地址：", contract_address)
 Contract = w3.eth.contract(address=contract_address, abi=abi)
 
-sk_I = 15872232885142738667420701097223674108720232256552480080547895231827275416057
-pk_I = multiply(G2, sk_I)
+sk_I = 15872232885142738667420701097223674108720232256552480080547895231827275416057  #可信第三方的私钥，其中这里为投票发起者的私钥
+pk_I = multiply(G2, sk_I)  #可信第三方公钥，为投票发起者的公钥
 
 
-# starttime = time.time()
-# SS=PVSS.DVerify(H1,shares["v"],pk,shares["c"],shares["raw"])
-# print("SCRAPE DDH verification cost ",time.time()- starttime)
-# print(SS)
-
-
-def Setup(a, b):
+def Setup(a, b):   #ZKRP的初始化，a-b为选定的范围，为范围内的整数生成sigam_k
     sigma_k = []
     for i in range(a, b + 1):
         temp = multiply(G1, sympy.mod_inverse((sk_I + i) % CURVE_ORDER, CURVE_ORDER))
@@ -75,36 +69,17 @@ def Setup(a, b):
     return {"sk_I": sk_I, "pk_I": pk_I, "sigam_k": sigma_k}
 
 
-def Prove(s_j, w_j, U_j, sigma_wj):
+def Prove(s_j, w_j, U_j, sigma_wj):  #ZKRP.Prove 生成Proof
     v = PVSS.random_scalar()
     s = PVSS.random_scalar()
     t = PVSS.random_scalar()
     m = PVSS.random_scalar()
-    # m1 = PVSS.random_scalar()
 
     E_j = multiply(sigma_wj, v)
-
-    """
-    par1=pairing(G2,multiply(E_j,CURVE_ORDER-s))*pairing(G2,multiply(G1,t))
-
-    def F_jTransform(par):
-    #F_j = pairing(G2,G1)*pairing
-        temp = re.findall("\d+",str(par))
-        tempF_j=[]
-        for i in range (len(temp)):
-            tempF_j.append(int(temp[i]))
-        return tuple(tempF_j)
-
-    F_j=F_jTransform(par1)
-    """
-    # F_j = add(multiply(G1,t),neg(multiply(E_j,s)))
-    # F_j = neg(F_j)
-    F_j1 = multiply(E_j, s)
-    F_j2 = neg(multiply(G1, t))
+    F_j1 = multiply(E_j, s)      #其中链下生成双线性配对十分漫长，将F_j拆分为两个群上的数，分别为F_j1和F_j2,上传到链上进行一次双线性配对
+    F_j2 = neg(multiply(G1, t))  #双线性配对起码占用3~5s时间 ，修改为群元素后，整个Prove生成平均只需要0.00085s
     U1_j = add(multiply(H1, s), multiply(G1, m))
     C1_j = multiply(H1, m)
-    # D_j =  add(multiply(L1,m),add(multiply(E_j,CURVE_ORDER-s),multiply(G1,t)))
-    # G_j = multiply(add(L1,neg(H1)),m1)
 
     c = keccak_256(
         abi_types=["uint256"] * 12,
@@ -122,11 +97,11 @@ def Prove(s_j, w_j, U_j, sigma_wj):
     z1 = (s - w_j * c) % CURVE_ORDER
     z2 = (t - v * c) % CURVE_ORDER
     z3 = (m - s_j * c) % CURVE_ORDER
-    # z4 = (m1 - m * c) % CURVE_ORDER
+
     return E_j, F_j1, F_j2, U1_j, C1_j, c, z1, z2, z3
 
 
-def Verify(proof, V_j, U_j, s_j, pk_I):
+def Verify(proof, V_j, U_j, s_j, pk_I):  #ZKRP的链下验证，为测试所用
     C_j = multiply(H1, s_j)
 
     if (proof[3] != add(multiply(C_j, proof[4]), multiply(H1, proof[7]))):
@@ -145,38 +120,33 @@ def Verify(proof, V_j, U_j, s_j, pk_I):
     return 1
 
 
-def ZKRP_verify(proof, V_j, lagrangeCoefficient, U_j, n, t):
+def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
     def IntsTransform(x):  # tuple/list transform to int[]
-        ints = [int(num) for num in x]
+        ints = [int(num) for num in x]   #格式转换，转换成int数组，方便传入链上
         return ints
 
-    vv = []
-    for i in range(0, n):
-        temp = PVSS.IntsTransform(V_j[i])
-        vv.extend([temp])
+    recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
 
-    result1 = Contract.functions.ZKRP_verify1(vv, lagrangeCoefficient, IntsTransform(proof[4]), proof[5],
-                                              proof[8]).call()
-    result2 = Contract.functions.ZKRP_verify2(IntsTransform(proof[3]), IntsTransform(U_j), proof[5], proof[6],
-                                              proof[8]).call()
-    result3 = Contract.functions.ZKRP_verify3(IntsTransform(proof[1]), IntsTransform(proof[2]), IntsTransform(proof[0]),
-                                              proof[5], proof[6], proof[7]).call()
+    def lagrange_coefficient(i: int) -> int:  #计算拉格朗日多项式系数
+        result = 1
+        for j in recIndex:
+            # print(j)
+            # j=j-1
+            if i != j:
+                result *= j * sympy.mod_inverse((j - i) % CURVE_ORDER, CURVE_ORDER)
+                result %= CURVE_ORDER
+        return result
 
-    return result1, result2, result3
+    lar = [lagrange_coefficient(i) for i in recIndex]   #转换为int[]
+    V = [IntsTransform(V_j[i]) for i in recIndex]  #转换为uint256[2][]
+    result1 = Contract.functions.ZKRP_verify1(V, lar).call() #ZKRP.Verify的第一个等式的验证
+    result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
+    result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证
 
+    if result1 and result2 and result3:  #三个验证等式全true，ZKRP.Verify才会返回true
+        return (True)
+    else:
+        return (False)
 
-"""
-GPK=Setup(1,5)
-#print(GPK["sigam_k"][0])
-s_j=1
-
-w_j=1
-U_j=add(multiply(H1,w_j), multiply(G1,s_j))
-
-for i in range(1,30):
-    starttime=time.time() #time test
-    proof = Prove1(s_j,w_j,U_j,GPK["sigam_k"][0])
-    print("PVSS.Share times  cost: ",time.time()- starttime ,"s")  #time test
-"""
 
 

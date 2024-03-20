@@ -8,19 +8,11 @@ import json  # to save the output in a JSON file
 import random
 import secrets
 import sympy  # consider removing this dependency, only needed for mod_inverse
-import re
-import numpy as np
-import hashlib
-import datetime
-import sys
-import time
-import ZKRP
 from py_ecc.bn128 import G1, G2
 from py_ecc.bn128 import add, multiply, neg, pairing, is_on_curve
 from py_ecc.bn128 import curve_order as CURVE_ORDER
 from py_ecc.bn128 import field_modulus as FIELD_MODULUS
 from typing import Tuple, Dict, List, Iterable, Union
-from py_ecc.fields import bn128_FQ as FQ
 
 with open("contracts/DAOsForVote.sol", "r") as file:
     contact_list_file = file.read()
@@ -66,7 +58,7 @@ keccak_256 = Web3.solidityKeccak
 H0=(9727523064272218541460723335320998459488975639302513747055235660443850046724,5031696974169251245229961296941447383441169981934237515842977230762345915487)
 H1=(5031696974169251245229961296941447383441169981934237515842977230762345915487,9727523064272218541460723335320998459488975639302513747055235660443850046724)
 """
-H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)
+H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909) #生成元H1
 
 
 def random_scalar() -> int:  # Generate random numbers
@@ -76,11 +68,11 @@ def random_scalar() -> int:  # Generate random numbers
 
 
 def IntsTransform(x):  # tuple/list transform to int[]
-    ints = [int(num) for num in x]
+    ints = [int(num) for num in x]  #数据转换
     return ints
 
 
-def Setup(n, t):  # PVSS Key Generation
+def Setup(n, t):  # PVSS Key Generation   #PVSS的公私钥产生，注意有效密钥从0开始索引
     """ Generates a random keypair on the BN128 curve.
         The public key is an element of the group G1.
         This key is used for deriving the encryption keys used to secure the shares.
@@ -97,7 +89,7 @@ def Setup(n, t):  # PVSS Key Generation
 def share_secret(secret: int, sharenum: int, threshold: int) -> Dict[
     int, int]:  # PVSS.Share(s,n,t) n is sharenum value .t is threshold value
     coefficients = [secret] + [random_scalar() for j in range(threshold)]
-
+    #Shamir 分享
     def f(x: int) -> int:
         """ evaluation function for secret polynomial
         """
@@ -113,10 +105,11 @@ def share_secret(secret: int, sharenum: int, threshold: int) -> Dict[
 def Dateconvert(res, n):  # Data conversion functions for bilinear pairing on-chain
     c1 = [0]
     c2 = [0]
-
+    #数据格式转换，将c(x,y)分开放入单组的数组中
     v1 = [0]
     v2 = [0]
-
+    # 数据格式转换，将v(x,y)分开放入单组的数组中
+    # #注意，因为Share的c，v从1开始为有效数据，所以输出的数组第一位都为0
     c1.extend(int(res["c"][i][0]) for i in range(1, n + 1))
     c2.extend(int(res["c"][i][1]) for i in range(1, n + 1))
     v1.extend(int(res["v"][i][0]) for i in range(1, n + 1))
@@ -124,41 +117,22 @@ def Dateconvert(res, n):  # Data conversion functions for bilinear pairing on-ch
     return {"c1": c1, "c2": c2, "v1": v1, "v2": v2}  # c1 is x of c, c2 is y of c. And v1,v2,s1,s2 so on...
 
 
-def Share2(s_j, H1, pk, n, t):
-    PVSSshare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
-    print(PVSSshare)
-    v = []
-    c = []
-    DLEQ_Proof = []
-    """
-    print(PVSSshare)
-    for i in range(0,n):
-        print(PVSSshare[i+1])
-        tmp=multiply(G1,PVSSshare[i+1])
-        v.extend(tmp)
-    """
-    v.extend([multiply(H1, PVSSshare[i + 1]) for i in range(0, n)])  # v_i=g2^s_i
-    c.extend([multiply(pk[i], PVSSshare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
-    DLEQ_Proof.extend([DLEQ(H1, v[i], pk[i], c[i], PVSSshare[i + 1]) for i in range(0, n)])
-    res = {"v": v, "c": c, "DLEQ_Proof": DLEQ_Proof}
-    return res
-
-
 def Share(s_j, H1, pk, n, t):
     SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
-    print(SSShare)
+    #注意数组第一位为0，v，c数组长度为n+1
     v = [0]
     c = [0]
     DLEQ_Proof = [0]
-    v.extend([multiply(H1, SSShare[i + 1]) for i in range(0, n)])  # v_i=g2^s_i
+    v.extend([multiply(H1, SSShare[i + 1]) for i in range(0, n)])  # v_i=H1^s_i
     c.extend([multiply(pk[i], SSShare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
 
     DLEQ_Proof.extend([DLEQ(H1, v[i + 1], pk[i], c[i + 1], SSShare[i + 1]) for i in range(0, n)])
+    #DLEQ的Proof为证明v，c确实是由该多项式f(x)所生成,例如s_i=f(i)。
     res = {"v": v, "c": c, "DLEQ_Proof": DLEQ_Proof}
     return res
 
 
-def DLEQ(x1, y1, x2, y2, alpha: int) -> Tuple[int, int]:
+def DLEQ(x1, y1, x2, y2, alpha: int) -> Tuple[int, int]:  #生成DLEQ承诺 alpha为需要承诺的零知识证明的值
     """ DLEQ... discrete logarithm equality
         Proofs that the caller knows alpha such that y1 = x1**alpha and y2 = x2**alpha
         without revealing alpha.
@@ -183,7 +157,7 @@ def DLEQ(x1, y1, x2, y2, alpha: int) -> Tuple[int, int]:
     return c, r
 
 
-def DLEQ_verify(x1, y1, x2, y2, challenge: int, response: int) -> bool:
+def DLEQ_verify(x1, y1, x2, y2, challenge: int, response: int) -> bool: #DLEQ_Verify的链下验证函数
     a1 = add(multiply(x1, response), multiply(y1, challenge))
     a2 = add(multiply(x2, response), multiply(y2, challenge))
     c = keccak_256(  # pylint: disable=E1120
@@ -201,45 +175,16 @@ def DLEQ_verify(x1, y1, x2, y2, challenge: int, response: int) -> bool:
     c = int.from_bytes(c, "big")
     return c == challenge
 
+#删除PVSS.DVerify和PVSS.PVerify，将此部分转移到链上进行
 
-def DVerify(h0, V_j, pk, C_j, sh_j, n, t):
-    for i in range(0, n):
-        proof = DLEQ(h0, V_j[i], pk[i], C_j[i], sh_j[i + 1])
-        result = Contract.functions.DLEQ_verify(IntsTransform(h0), IntsTransform(V_j[i]), IntsTransform(pk[i]),
-                                                IntsTransform(C_j[i]), IntsTransform(proof)).call()
-        # gas=Contract.functions.DLEQ_verify(IntsTransform(h0),IntsTransform(V_j[i]),IntsTransform(pk[i]),IntsTransform(C_j[i]),IntsTransform(proof)).estimateGas()
-        # print("init ","  ...",gas)
-        if (result != True):
-            return 0
-    return 1
-
-
-def Decrypt(c_ji, sk_i):
+def Decrypt(c_ji, sk_i):  #PVSS.Decrypt，解密函数
     sh1_ji = multiply(c_ji, sympy.mod_inverse((sk_i) % CURVE_ORDER, CURVE_ORDER))
     return sh1_ji
 
 
-def DecryptShares(c, sk, n, t):
-    sh_j = []
-    for i in range(0, n):
-        temp = Decrypt(c[i], sk[i])
-        sh_j.extend([temp])
-    return sh_j
-
-
-def PVerify(g0, pk, sh1_j, C_j, sk, n, t):
-    for i in range(0, n):
-        proof = DLEQ(g0, pk[i], sh1_j[i], C_j[i], sk[i])
-        result = Contract.functions.DLEQ_verify(IntsTransform(g0), IntsTransform(pk[i]), IntsTransform(sh1_j[i]),
-                                                IntsTransform(C_j[i]), IntsTransform(proof)).call()
-        if (result != True):
-            return 0
-    return 1
-
-
-def Reconstruct(res, n, t):
+def Reconstruct(res, n, t):     #PVSS.Reconstruct  秘密恢复函数
     recIndex = [i + 1 for i in range(0, t + 1)]
-    # print(recIndex)
+    print(recIndex)
     sum = multiply(H1, 0)
 
     def lagrange_coefficient(i: int) -> int:
@@ -253,31 +198,26 @@ def Reconstruct(res, n, t):
         return result
 
     for i in recIndex:
-        # print("i",i)
+        print("i", i, lagrange_coefficient(i))
         sum = add(sum, multiply(res["v"][i], lagrange_coefficient(i)))
     return sum
 
-
+#留作测试所用
+"""                    
 if __name__ == '__main__':
-    key = Setup(10, 5)
+    key=Setup(10,5)
 
-    n = 10
-    t = 5
+    n=10
+    t=5
     print("answer")
-    print(multiply(H1, 233333))
+    print(multiply(H1,233333))
     print(".........")
 
-    res1 = Share(233333, H1, key["pk"], n, t)
-    res2 = Share2(233333, H1, key["pk"], n, t)
-    # print(res1)
-    # print(res2)
-    sum = Reconstruct(res1, 10, 6)
+    res1=Share(233333,H1,key["pk"],n,t)
+    sum=Reconstruct(res1,10,5)
     print(sum)
-
-    # res=Reconstruct2(share1,10,10)
-    # print(res)
-
-    # print(LagrangeCoefficient(share1["raw"]))
+    Reconstruct2(res1,10,5)
+"""
 
 
 
