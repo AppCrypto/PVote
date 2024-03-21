@@ -187,18 +187,22 @@ if __name__ == '__main__':
     print("...........................................Setup phase.............................................")
 
     n = 10  # 唱票者人数n
-    t = 5  # 门限值t
-
+    t = int(n/2+1)  # 门限值t
+    starttime=time.time()
     key = PVSS.Setup(n, t)  # PVSS Key Generation
+    print("PVSS.setup of each tallier average time:", "%.2f"%((time.time()- starttime)/n*1000),"ms")
     pk = key["pk"]  # Public key array
     sk = key["sk"]  # Private key array
     pks = [util.Point2IntArr(pk[i]) for i in range(n)]  # 公钥数据格式转换
     # 将公钥上传到智能合约
-    Contract.functions.setTalliresPK(pks).transact({'from': w3.eth.accounts[0]})
 
+    Contract.functions.setTalliresPK(pks).transact({'from': w3.eth.accounts[0]})
+    gas_estimate = Contract.functions.setTalliresPK(pks).estimateGas()
+    print("Initiator setup gas cost:",gas_estimate)
+    print("Initiator setup output size:","%.2f" %(len(str(pks))/1024),"B")
     a = 0  # 投票最小范围a
     b = 5  # 投票最大范围b
-    m = 5  # 参与投票人数
+    m = 3  # 参与投票人数
     GPK = ZKRP.Setup(a, b)  # ZKRP初始化
 
     print("............................................Voting phase...........................................")
@@ -225,7 +229,7 @@ if __name__ == '__main__':
 
     print("expected ballot value:", ballot)
 
-    w_j = 10
+    w_j = b+1
     Vj_Vote(w_j, n, t)  # 投票者投票函数
     if (Contract.functions.PVSS_DVerify().call() and Contract.functions.ZKRP_verify(t + 1).call()):
         print("Both PVSS_DVerify result and ZKRP_Verify result return true")
@@ -235,9 +239,9 @@ if __name__ == '__main__':
 
     print("..........................................tallying phase...........................................")
 
-    temp_t = t + 2  # for循环的方式生成唱票者，每当有一个唱票者完成Ti_Tally函数，则会在链上成功上传一份解密份额，当满足t个份额时可以调用Tally函数进行唱票
-    for i in range(1, temp_t + 1):
-        Ti_Tally(i, pk[i - 1], sk[i - 1])
+    temp_t = t+1   # for循环的方式生成唱票者，每当有一个唱票者完成Ti_Tally函数，则会在链上成功上传一份解密份额，当满足t个份额时可以调用Tally函数进行唱票
+    for i in range(0, temp_t):
+        Ti_Tally(i+1, pk[i], sk[i])
     # 用完成任务的唱票者数量来代替t的恢复门限值，比如想控制9个份额参与秘密恢复，则使得9个唱票者完成任务，即调用9个唱票者函数
     # 也可以全部列出，以表示t个唱票者完成任务  ，以下例子为10个唱票者完成任务
 
