@@ -145,13 +145,13 @@ contract DAOsForVote {
      //下载单个所聚合的c，v的数据，No为第几个数
     function DownloadAGGVC(uint No) public returns (uint256[2] memory, uint256[2] memory)
     {
-        return (AGGPointC[No],AGGPointV[No]);
+        return (AGGPointC[No-1],AGGPointV[No-1]);
     }
 
     //上传解密份额和dleq_Proof数据，调用PVSS_PVerify，通过则保留份额到DecryptedShare数组中
     function Decrypted_SharetoSC(uint No, uint256[2] memory DShare, uint256[2] memory P_Proof) public returns (bool)
     {
-        if(PVSS_PVerify(Tallires_pk[No-1], DShare, AGGPointC[No], P_Proof))
+        if(PVSS_PVerify(Tallires_pk[No-1], DShare, AGGPointC[No-1], P_Proof))
         {
             DecryptedShare.push(DShare);
             return true;
@@ -193,7 +193,7 @@ contract DAOsForVote {
     public
     {
         uint elements = VoteData.c1.length;  //get array length
-        for(uint i=1; i<elements; i++)
+        for(uint i=0; i<elements; i++)
         {
             AGGPointC[i]=bn128_add([VoteData.c1[i], VoteData.c2[i], AGGPointC[i][0], AGGPointC[i][1]]);
             AGGPointV[i]=bn128_add([VoteData.v1[i], VoteData.v2[i], AGGPointV[i][0], AGGPointV[i][1]]);
@@ -305,10 +305,10 @@ contract DAOsForVote {
     {
 
         uint elements = VoteData.c1.length;  //get array length
-        for (uint i = 1; i < elements; i++)
+        for (uint i = 0; i < elements; i++)
         {
 
-            if(!DLEQ_verify([H1x,H1y],[VoteData.v1[i], VoteData.v2[i]],[Tallires_pk[i-1][0],Tallires_pk[i-1][1]],[VoteData.c1[i], VoteData.c2[i]],[VoteData.D_Proof[i][0],VoteData.D_Proof[i][1]]))
+            if(!DLEQ_verify([H1x,H1y],[VoteData.v1[i], VoteData.v2[i]],[Tallires_pk[i][0],Tallires_pk[i][1]],[VoteData.c1[i], VoteData.c2[i]],[VoteData.D_Proof[i][0],VoteData.D_Proof[i][1]]))
             {
                 return false;
             }
@@ -351,17 +351,17 @@ contract DAOsForVote {
         proof_is_valid = challenge == proof[0];
     }
 
-    /*
-    function ZKRP_verify()
-    public returns (bool proof1, bool proof2, bool proof3)
+
+    function ZKRP_verify(uint8 t)
+    public returns (bool)
     {
-        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient);
-        proof1 = ZKRP_verify1(C1_j, C_j, c, z3);
-        proof2 = ZKRP_verify2(U1_j, U_j, c, z3, z1);
-        //proof3 = ZKRP_verify3(F_j1, F_j2, E_j, c, z1, z2); //c, z1, z2, pk_I
-        //proof_is_valid = proof1 && proof2;
+
+        bool proof1 = ZKRP_verify1(t);
+        bool proof2 = ZKRP_verify2();
+        bool proof3 = ZKRP_verify3();
+        return proof1 && proof2 && proof3;
     }
-    */
+
 
      //链上插值函数
     function  Interpolate(
@@ -384,15 +384,28 @@ contract DAOsForVote {
         return a1;
     }
 
+    function mergeArrays(uint[] memory arr1, uint[] memory arr2) public  returns (uint[2][] memory) {
+        require(arr1.length == arr2.length, "Input arrays must have the same length");
+
+        uint[2][] memory mergedArray = new uint[2][](arr1.length);
+
+        for (uint i = 0; i < arr1.length; i++) {
+            mergedArray[i][0] = arr1[i];
+            mergedArray[i][1] = arr2[i];
+        }
+
+        return mergedArray;
+    }
+
+
      //ZKRP第一个等式的链上验证
-    function ZKRP_verify1(
-        uint256[2][] memory V
-    )
+    function ZKRP_verify1(uint8 t)
     public returns (bool proof_is_valid)
     {
-
+        uint256[2][] memory V;
+        V=mergeArrays(VoteData.v1,VoteData.v2);
         uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient2(V.length);
+        lagrange_coefficient = lagrangeCoefficient(t);
         //uint elements=lagrange_coefficient.length;
         uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient);
         uint256[2] memory temp;
@@ -462,7 +475,6 @@ contract DAOsForVote {
 		return pairing(p1, p2);
     }
 
-    uint256[] public lar;  //待优化，可以删除
 
     //求逆函数，在群范围内求逆
     function inv(uint256 a, uint256 prime) public returns (uint256){
@@ -480,30 +492,8 @@ contract DAOsForVote {
 	    return result[0];
 	}
 
-    //第一版，能用，生成拉格朗日插值系数，但是存放在外部的公共数组中，待优化
-    function lagrangeCoefficient(uint256 t) public {
-
-        uint256 result = 1;
-        uint256 inverse = 0;
-        uint256 intermediate_result = 0;
-        for (uint256 i = 1; i< t+1 ; i++)
-        {
-            result=1;
-            for (uint256 j = 1; j < t+1;j++) {
-                if (i != j) {
-                    //inverse = inv((j.sub(i)).mod(GROUP_ORDER), GROUP_ORDER);
-                    inverse = inv(((j+GROUP_ORDER-i)%GROUP_ORDER), GROUP_ORDER);//%GROUP_ORDER
-                    intermediate_result = mulmod(j,inverse,GROUP_ORDER);
-                    result = mulmod(result,intermediate_result,GROUP_ORDER);
-                }
-            }
-            lar.push(result);
-        }
-
-    }
-
     //目前使用的是这个，我晚上回来继续修改，生成朗日插值系数函数(生成拉格朗日插值并返回)
-    function lagrangeCoefficient2(uint256 t) public returns (uint256[] memory){
+    function lagrangeCoefficient(uint256 t) public returns (uint256[] memory){
 
         uint256[] memory lar2 = new uint256[](t);
         uint256 result = 1;
@@ -530,7 +520,7 @@ contract DAOsForVote {
     public returns(uint256[2] memory)
     {
         uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient2(DecryptedShare.length);  //目前使用的 lagrangeCoefficient2
+        lagrange_coefficient = lagrangeCoefficient(DecryptedShare.length);
         uint256[2] memory G1ACC;
         G1ACC =  Interpolate(DecryptedShare, lagrange_coefficient);
         G1ACC =  bn128_add([AGGPointU[0], AGGPointU[1], G1ACC[0], G1neg(G1ACC[1])]);

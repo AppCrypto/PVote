@@ -68,9 +68,6 @@ def random_scalar() -> int:  # Generate random numbers
     return secrets.randbelow(CURVE_ORDER)
 
 
-
-
-
 def Setup(n, t):  # PVSS Key Generation   #PVSS的公私钥产生，注意有效密钥从0开始索引
     """ Generates a random keypair on the BN128 curve.
         The public key is an element of the group G1.
@@ -103,17 +100,17 @@ def share_secret(secret: int, sharenum: int, threshold: int) -> Dict[
 
 
 def Dateconvert(res, n):  # Data conversion functions for bilinear pairing on-chain
-    c1 = [0]
-    c2 = [0]
+    c1 = []
+    c2 = []
     # 数据格式转换，将c(x,y)分开放入单组的数组中
-    v1 = [0]
-    v2 = [0]
+    v1 = []
+    v2 = []
     # 数据格式转换，将v(x,y)分开放入单组的数组中
     # #注意，因为Share的c，v从1开始为有效数据，所以输出的数组第一位都为0
-    c1.extend(int(res["c"][i][0]) for i in range(1, n + 1))
-    c2.extend(int(res["c"][i][1]) for i in range(1, n + 1))
-    v1.extend(int(res["v"][i][0]) for i in range(1, n + 1))
-    v2.extend(int(res["v"][i][1]) for i in range(1, n + 1))
+    c1.extend(int(res["c"][i][0]) for i in range(0, n))
+    c2.extend(int(res["c"][i][1]) for i in range(0, n))
+    v1.extend(int(res["v"][i][0]) for i in range(0, n))
+    v2.extend(int(res["v"][i][1]) for i in range(0, n))
     return {"c1": c1, "c2": c2, "v1": v1, "v2": v2}  # c1 is x of c, c2 is y of c. And v1,v2,s1,s2 so on...
 
 
@@ -128,7 +125,7 @@ def Share(s_j, H1, pk, n, t):
 
     DLEQ_Proof.extend([DLEQ(H1, v[i + 1], pk[i], c[i + 1], SSShare[i + 1]) for i in range(0, n)])
     # DLEQ的Proof为证明v，c确实是由该多项式f(x)所生成,例如s_i=f(i)。
-    res = {"v": v, "c": c, "DLEQ_Proof": DLEQ_Proof}
+    res = {"v": v[1:], "c": c[1:], "DLEQ_Proof": DLEQ_Proof[1:]}
     return res
 
 
@@ -187,7 +184,7 @@ def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
     recIndex = [i + 1 for i in range(0, t + 1)]
     print(recIndex)
     sum = multiply(H1, 0)
-    
+
     for i in recIndex:
         print("i", i, util.lagrange_coefficient(i))
         sum = add(sum, multiply(res["v"][i], util.lagrange_coefficient(i)))
@@ -198,6 +195,7 @@ def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
 
 if __name__ == '__main__':
     key = Setup(10, 5)
+    print(Contract.functions.lagrangeCoefficient2(5).call())
 
     n = 10
     t = 5
@@ -206,9 +204,11 @@ if __name__ == '__main__':
     print(".........")
 
     res1 = Share(233333, H1, key["pk"], n, t)
-    sum = Reconstruct(res1, 10, 5)
-    print(sum)
+    print(res1)
+    # sum = Reconstruct(res1, 10, 5)
+    # print(sum)
     # Reconstruct2(res1,10,5)
+
 
 
 

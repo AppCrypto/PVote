@@ -98,7 +98,6 @@ def Prove(s_j, w_j, U_j, sigma_wj):  #ZKRP.Prove 生成Proof
     z1 = (s - w_j * c) % CURVE_ORDER
     z2 = (t - v * c) % CURVE_ORDER
     z3 = (m - s_j * c) % CURVE_ORDER
-
     return E_j, F_j1, F_j2, U1_j, C1_j, c, z1, z2, z3
 
 
@@ -137,15 +136,18 @@ def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
         return (False)
 
 
-def ZKRP_verify2(V_j, n, t):        #ZKRP的链上验证    
+def ZKRP_verify2(V_j, n, t):        #ZKRP的链上验证
     recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
 
     V = [util.Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
+    #print(V)
     result1 = Contract.functions.ZKRP_verify1(V).call() #ZKRP.Verify的第一个等式的验证
     result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
     result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证
-
+    """
     if result1 and result2 and result3:  #三个验证等式全true，ZKRP.Verify才会返回true
         return (True)
     else:
         return (False)
+    """
+    return (result1,result2,result3)

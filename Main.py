@@ -65,16 +65,22 @@ pks = []
 def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了一个投票者V_j应该完成的事务，（n，t）为秘密分享参与人数和门限值
     s_j = PVSS.random_scalar()
     # 生成随机数
+    starttime = time.time()
     shares = PVSS.Share(s_j, H1, pk, n, t)
+    t1 = time.time() - starttime
+    print("PVSS_Share spent time:", t1)
     # 调用PVSS.Share
 
     U_j = add(multiply(H1, w_j), multiply(G1, s_j))
     # 链下计算U_j
-    zkrp_proof = ZKRP.Prove(s_j, w_j, U_j, GPK["sigam_k"][(w_j - 1) % b])
+    starttime2 = time.time()
+    zkrp_proof = ZKRP.Prove(s_j, w_j, U_j, GPK["sigam_k"][(w_j) % (b + 1)])
     # 为所生成的数据调用ZKRP.Prove生成对应的承诺
+    t2 = time.time() - starttime2
+    print("ZKRP.Prove spent time:", t2)
 
-    dleq_proof = [[0, 0]]
-    for i in range(1, n + 1):
+    dleq_proof = []
+    for i in range(0, n):
         temp = util.Point2IntArr(shares["DLEQ_Proof"][i])
         dleq_proof.extend([temp])
     # 为DLEQ Proof数据格式转换
@@ -88,7 +94,7 @@ def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了�
                                 util.Point2IntArr(zkrp_proof[4]), zkrp_proof[5], zkrp_proof[6], zkrp_proof[7],
                                 zkrp_proof[8]).transact({'from': w3.eth.accounts[0]})
     print("Vote value:", w_j)
-    return shares["v"][1:]  # 给ZKRP.Verify提供V_j ,因为生成的v数组第一位为无效0，智能合约上没有像Python方便的操作
+    # return shares["v"][1:]  # 给ZKRP.Verify提供V_j ,因为生成的v数组第一位为无效0，智能合约上没有像Python方便的操作
 
 
 def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i应该完成的事务
@@ -103,20 +109,28 @@ def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i�
     # pk_i = (FQ(pk_i[0]), FQ(pk_i[1]))
 
     # 调用PVSS.Decrypt函数为累积份额C解密
+    starttime = time.time()
     sh1 = PVSS.Decrypt(C_i, sk_i)
-
+    t1 = time.time() - starttime
+    print("PVSS_Decrypt spent time:", t1)
     # 生成DLEQ P_Proof,证明是该唱票者T_i所解密的份额c
     proof = PVSS.DLEQ(G1, pk_i, sh1, C_i, sk_i)
+
     # 把解密份额和P_Proof上传到链上，通过验证后则将解密份额保留在链上DecryptedShare数组中
     Contract.functions.Decrypted_SharetoSC(No, util.Point2IntArr(sh1), util.Point2IntArr(proof)).transact(
         {'from': w3.eth.accounts[0]})
 
+    gas_estimate = Contract.functions.Decrypted_SharetoSC(No, util.Point2IntArr(sh1),
+                                                          util.Point2IntArr(proof)).estimateGas()
+    print("PVSS_PVerify gas cost:", gas_estimate)
     print("Tallier", No, "done")
 
 
 def Aggreagate():  # 执行一次链上的Aggregate函数，将V,C数据聚合到链上，因为v，c数据已经保留在链上了，所以无需参数输入
-    Contract.functions.Aggregate().transact({'from': w3.eth.accounts[0]})
 
+    Contract.functions.Aggregate().transact({'from': w3.eth.accounts[0]})
+    gas_estimate = Contract.functions.Aggregate().estimateGas()
+    print("Aggregate gas cost:", gas_estimate)
     print("Aggregate done.")
 
 
@@ -124,6 +138,8 @@ def Tally(m):  # 链上唱票，输入参数m（投票人数）是因为要确�
 
     # 得到投票结果
     result = Contract.functions.Tally().call()
+    gas_estimate = Contract.functions.Tally().estimateGas()
+    print("Tally gas cost:", gas_estimate)
     # 计算所有投票值的可能
     AllResult = {}
     for i in range(a * m, b * m + 1):
@@ -151,6 +167,21 @@ def ReturnPK():  # 返回链上公钥，测试所用
     # print("pk-onchain:"+str(res))
 
 
+def ZKRP_verify2(n, t):  # ZKRP的链上验证
+
+    # print(V)
+    result1 = Contract.functions.ZKRP_verify1(t).call()  # ZKRP.Verify的第一个等式的验证
+    result2 = Contract.functions.ZKRP_verify2().call()  # ZKRP.Verify的第二个等式的验证
+    result3 = Contract.functions.ZKRP_verify3().call()  # ZKRP.Verify的第三个等式的验证
+    """
+    if result1 and result2 and result3:  #三个验证等式全true，ZKRP.Verify才会返回true
+        return (True)
+    else:
+        return (False)
+    """
+    return (result1, result2, result3)
+
+
 if __name__ == '__main__':
 
     print("...........................................Setup phase.............................................")
@@ -172,37 +203,44 @@ if __name__ == '__main__':
 
     print("............................................Voting phase...........................................")
 
-
-    #目前用的是ZKRP_verify2，还有V_ji的这部分需要继续优化
+    # 目前用的是ZKRP_verify2，还有V_ji的这部分需要继续优化
     # 第一个投票者
-    ballot=0
+    ballot = 0
     for i in range(0, m):
-        w_j = int(random.random()*(b-a+1)+a)
-        ballot+=w_j
-        V_j1 = Vj_Vote(w_j, n, t)  # 投票者投票函数
-        print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())  # 链上PVSS.DVerify
-        print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_j1, n, t))  # 链上ZKRP.Verify
-        Aggreagate()  # 通过两个验证后将投票上传的数据聚合
+        w_j = int(random.random() * (b - a + 1) + a)
+        ballot += w_j
+        Vj_Vote(w_j, n, t)  # 投票者投票函数
+        if (Contract.functions.PVSS_DVerify().call() and Contract.functions.ZKRP_verify(t + 1).call()):
+            print("Both PVSS_DVerify result and ZKRP_Verify result return true")
+            gas_estimate1 = Contract.functions.PVSS_DVerify().estimateGas()
+            print("PVSS.DVerify gas cost:", gas_estimate1)
+
+            # gas_estimate2 = Contract.functions.ZKRP_verify( t+1 ).estimateGas()
+            # print("ZKRP.Verify gas cost:",gas_estimate2)
+            Aggreagate()  # 通过两个验证后将投票上传的数据聚合
+        else:
+            print("Invalid vote value w_j......did not aggreagate in SC")
+        # print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())  # 链上PVSS.DVerify
+        # print("ZKRP_Verify result:", Contract.functions.ZKRP_verify( t+1 ).call()) # 链上ZKRP.Verify
+
     print("expected ballot value:", ballot)
+
+    w_j = 10
+    Vj_Vote(w_j, n, t)  # 投票者投票函数
+    if (Contract.functions.PVSS_DVerify().call() and Contract.functions.ZKRP_verify(t + 1).call()):
+        print("Both PVSS_DVerify result and ZKRP_Verify result return true")
+        Aggreagate()  # 通过两个验证后将投票上传的数据聚合
+    else:
+        print("Invalid vote value......did not aggreagate")
+
     print("..........................................tallying phase...........................................")
 
-    temp_t = t+1  # for循环的方式生成唱票者，每当有一个唱票者完成Ti_Tally函数，则会在链上成功上传一份解密份额，当满足t个份额时可以调用Tally函数进行唱票
+    temp_t = t + 2  # for循环的方式生成唱票者，每当有一个唱票者完成Ti_Tally函数，则会在链上成功上传一份解密份额，当满足t个份额时可以调用Tally函数进行唱票
     for i in range(1, temp_t + 1):
         Ti_Tally(i, pk[i - 1], sk[i - 1])
     # 用完成任务的唱票者数量来代替t的恢复门限值，比如想控制9个份额参与秘密恢复，则使得9个唱票者完成任务，即调用9个唱票者函数
     # 也可以全部列出，以表示t个唱票者完成任务  ，以下例子为10个唱票者完成任务
-    """
-    Ti_Tally(1,sk[0])
-    Ti_Tally(2,sk[1])
-    Ti_Tally(3,sk[2])
-    Ti_Tally(4,sk[3])
-    Ti_Tally(5,sk[4])
-    Ti_Tally(6,sk[5])
-    Ti_Tally(7,sk[6])
-    Ti_Tally(8,sk[7])
-    Ti_Tally(9,sk[8])
-    Ti_Tally(10,sk[9])
-    """
+
     # Tally(temp_t ,m)  #链上唱票
     Tally(m)  # 链上唱票
     print("............................................Reward phase...........................................")
