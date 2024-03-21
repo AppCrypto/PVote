@@ -6,6 +6,7 @@ from solcx import compile_standard, install_solc
 install_solc("0.8.0")
 import json  # to save the output in a JSON file
 import PVSS
+import util
 import time
 import re
 import sympy  # Needed for mod_inverse
@@ -121,9 +122,6 @@ def Verify(proof, V_j, U_j, s_j, pk_I):  #ZKRP的链下验证，为测试所用
 
 
 def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
-    def Point2IntArr(x):  # tuple/list transform to int[]
-        ints = [int(num) for num in x]   #格式转换，转换成int数组，方便传入链上
-        return ints
 
     recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
 
@@ -138,7 +136,7 @@ def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
         return result
 
     lar = [lagrange_coefficient(i) for i in recIndex]   #转换为int[]
-    V = [Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
+    V = [util.Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
     result1 = Contract.functions.ZKRP_verify1(V, lar).call() #ZKRP.Verify的第一个等式的验证
     result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
     result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证
@@ -149,14 +147,10 @@ def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
         return (False)
 
 
-def ZKRP_verify2(V_j, n, t):        #ZKRP的链上验证
-    def Point2IntArr(x):  # tuple/list transform to int[]
-        ints = [int(num) for num in x]   #格式转换，转换成int数组，方便传入链上
-        return ints
-
+def ZKRP_verify2(V_j, n, t):        #ZKRP的链上验证    
     recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
 
-    V = [Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
+    V = [util.Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
     result1 = Contract.functions.ZKRP_verify1(V).call() #ZKRP.Verify的第一个等式的验证
     result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
     result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证

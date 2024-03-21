@@ -9,6 +9,7 @@ import sympy  # consider removing this dependency, only needed for mod_inverse
 import time
 import ZKRP
 import PVSS
+import util
 from py_ecc.bn128 import G1, G2
 from py_ecc.bn128 import add, multiply, neg, pairing, is_on_curve
 from py_ecc.bn128 import curve_order as CURVE_ORDER
@@ -73,7 +74,7 @@ def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了�
 
     dleq_proof = [[0, 0]]
     for i in range(1, n + 1):
-        temp = PVSS.Point2IntArr(shares["DLEQ_Proof"][i])
+        temp = util.Point2IntArr(shares["DLEQ_Proof"][i])
         dleq_proof.extend([temp])
     # 为DLEQ Proof数据格式转换
     agg = PVSS.Dateconvert(shares, n)  # Data transformation  数据转换
@@ -81,9 +82,9 @@ def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了�
     Contract.functions.PVSStoSC(agg["c1"], agg["c2"], agg["v1"], agg["v2"], int(U_j[0]), int(U_j[1]),
                                 dleq_proof).transact({'from': w3.eth.accounts[0]})
     # 将投票者生成的ZKRP.Prove生成的Proof传输到智能合约上
-    Contract.functions.ZKRPtoSC(PVSS.Point2IntArr(zkrp_proof[0]), PVSS.Point2IntArr(zkrp_proof[1]),
-                                PVSS.Point2IntArr(zkrp_proof[2]), PVSS.Point2IntArr(zkrp_proof[3]),
-                                PVSS.Point2IntArr(zkrp_proof[4]), zkrp_proof[5], zkrp_proof[6], zkrp_proof[7],
+    Contract.functions.ZKRPtoSC(util.Point2IntArr(zkrp_proof[0]), util.Point2IntArr(zkrp_proof[1]),
+                                util.Point2IntArr(zkrp_proof[2]), util.Point2IntArr(zkrp_proof[3]),
+                                util.Point2IntArr(zkrp_proof[4]), zkrp_proof[5], zkrp_proof[6], zkrp_proof[7],
                                 zkrp_proof[8]).transact({'from': w3.eth.accounts[0]})
     print("Vote done")
     return shares["v"][1:]  # 给ZKRP.Verify提供V_j ,因为生成的v数组第一位为无效0，智能合约上没有像Python方便的操作
@@ -106,7 +107,7 @@ def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i�
     # 生成DLEQ P_Proof,证明是该唱票者T_i所解密的份额c
     proof = PVSS.DLEQ(G1, pk_i, sh1, C_i, sk_i)
     # 把解密份额和P_Proof上传到链上，通过验证后则将解密份额保留在链上DecryptedShare数组中
-    Contract.functions.Decrypted_SharetoSC(No, PVSS.Point2IntArr(sh1), PVSS.Point2IntArr(proof)).transact(
+    Contract.functions.Decrypted_SharetoSC(No, util.Point2IntArr(sh1), util.Point2IntArr(proof)).transact(
         {'from': w3.eth.accounts[0]})
 
     print("Tallier", No, "done")
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     key = PVSS.Setup(n, t)  # PVSS Key Generation
     pk = key["pk"]  # Public key array
     sk = key["sk"]  # Private key array
-    pks = [PVSS.Point2IntArr(pk[i]) for i in range(n)]  # 公钥数据格式转换
+    pks = [util.Point2IntArr(pk[i]) for i in range(n)]  # 公钥数据格式转换
     # 将公钥上传到智能合约
     Contract.functions.setTalliresPK(pks).transact({'from': w3.eth.accounts[0]})
 
@@ -192,7 +193,7 @@ if __name__ == '__main__':
 
     print("..........................................tallying phase...........................................")
 
-    temp_t = 10  # for循环的方式生成唱票者，每当有一个唱票者完成Ti_Tally函数，则会在链上成功上传一份解密份额，当满足t个份额时可以调用Tally函数进行唱票
+    temp_t = t+1  # for循环的方式生成唱票者，每当有一个唱票者完成Ti_Tally函数，则会在链上成功上传一份解密份额，当满足t个份额时可以调用Tally函数进行唱票
     for i in range(1, temp_t + 1):
         Ti_Tally(i, pk[i - 1], sk[i - 1])
     # 用完成任务的唱票者数量来代替t的恢复门限值，比如想控制9个份额参与秘密恢复，则使得9个唱票者完成任务，即调用9个唱票者函数

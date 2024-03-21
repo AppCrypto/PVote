@@ -6,6 +6,7 @@ from solcx import compile_standard, install_solc
 install_solc("0.8.0")
 import json  # to save the output in a JSON file
 import random
+import util
 import secrets
 import sympy  # consider removing this dependency, only needed for mod_inverse
 from py_ecc.bn128 import G1, G2
@@ -67,9 +68,7 @@ def random_scalar() -> int:  # Generate random numbers
     return secrets.randbelow(CURVE_ORDER)
 
 
-def Point2IntArr(x):  # tuple/list transform to int[]
-    ints = [int(num) for num in x]  # 数据转换
-    return ints
+
 
 
 def Setup(n, t):  # PVSS Key Generation   #PVSS的公私钥产生，注意有效密钥从0开始索引
