@@ -125,17 +125,7 @@ def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
 
     recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
 
-    def lagrange_coefficient(i: int) -> int:  #计算拉格朗日多项式系数
-        result = 1
-        for j in recIndex:
-            # print(j)
-            # j=j-1
-            if i != j:
-                result *= j * sympy.mod_inverse((j - i) % CURVE_ORDER, CURVE_ORDER)
-                result %= CURVE_ORDER
-        return result
-
-    lar = [lagrange_coefficient(i) for i in recIndex]   #转换为int[]
+    lar = [util.lagrange_coefficient(i) for i in recIndex]   #转换为int[]
     V = [util.Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
     result1 = Contract.functions.ZKRP_verify1(V, lar).call() #ZKRP.Verify的第一个等式的验证
     result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证

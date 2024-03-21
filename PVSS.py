@@ -187,20 +187,10 @@ def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
     recIndex = [i + 1 for i in range(0, t + 1)]
     print(recIndex)
     sum = multiply(H1, 0)
-
-    def lagrange_coefficient(i: int) -> int:
-        result = 1
-        for j in recIndex:
-            # print(j)
-            # j=j-1
-            if i != j:
-                result *= j * sympy.mod_inverse((j - i) % CURVE_ORDER, CURVE_ORDER)
-                result %= CURVE_ORDER
-        return result
-
+    
     for i in recIndex:
-        print("i", i, lagrange_coefficient(i))
-        sum = add(sum, multiply(res["v"][i], lagrange_coefficient(i)))
+        print("i", i, util.lagrange_coefficient(i))
+        sum = add(sum, multiply(res["v"][i], util.lagrange_coefficient(i)))
     return sum
 
 
