@@ -118,26 +118,10 @@ def Aggreagate():  # 执行一次链上的Aggregate函数，将V,C数据聚合�
     print("Aggregate done.")
 
 
-def Tally(t, m):  # 链上唱票，输入参数m（投票人数）是因为要确定投票数值范围（a*m,b*m)
-
-    recIndex = [i + 1 for i in range(0, t)]
-
-    # print(recIndex)
-    def lagrange_coefficient(i: int) -> int:  # 计算拉格朗日插值系数
-        result = 1
-        for j in recIndex:
-            # print(j)
-            # j=j-1
-            if i != j:
-                result *= j * sympy.mod_inverse((j - i) % CURVE_ORDER, CURVE_ORDER)
-                result %= CURVE_ORDER
-        return result
-
-    # 数据转换
-    lar = [lagrange_coefficient(i) for i in recIndex]
+def Tally(m):  # 链上唱票，输入参数m（投票人数）是因为要确定投票数值范围（a*m,b*m)
 
     # 得到投票结果
-    result = Contract.functions.Tally(lar).call()
+    result = Contract.functions.Tally().call()
     # 计算所有投票值的可能
     AllResult = {}
     for i in range(a * m, b * m + 1):
@@ -146,9 +130,10 @@ def Tally(t, m):  # 链上唱票，输入参数m（投票人数）是因为要�
     for i in range(a * m, b * m + 1):
         if (AllResult[i] != None and result[0] == AllResult[i][0] and result[1] == AllResult[i][1]):
             print("The vote score is " + str(i + a * m))
-            break
+            return result
 
-    return result
+    print("No vote result")
+    return False
 
 
 def ReturnDate():  # 返回当前所聚合的AGG的数据，测试所用
@@ -185,22 +170,24 @@ if __name__ == '__main__':
 
     print("............................................Voting phase...........................................")
 
+
+    #目前用的是ZKRP_verify2，还有V_ji的这部分需要继续优化
     # 第一个投票者
     V_j1 = Vj_Vote(0, n, t)  # 投票者投票函数
     print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())  # 链上PVSS.DVerify
-    print("ZKRP_Verify result:", ZKRP.ZKRP_verify(V_j1, n, t))  # 链上ZKRP.Verify
+    print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_j1, n, t))  # 链上ZKRP.Verify
     Aggreagate()  # 通过两个验证后将投票上传的数据聚合
 
     # 第二个投票者
     V_j2 = Vj_Vote(3, n, t)
     print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())
-    print("ZKRP_Verify result:", ZKRP.ZKRP_verify(V_j2, n, t))
+    print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_j2, n, t))
     Aggreagate()
 
     for i in range(0, 3):  # for循环的方式生成第3.4.5个投票者  可以调整，投票人数的加入需要和参与投票人数m对应
         V_ji = Vj_Vote(2, n, t)
         print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())
-        print("ZKRP_Verify result:", ZKRP.ZKRP_verify(V_ji, n, t))
+        print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_ji, n, t))
         Aggreagate()
 
     print("..........................................tallying phase...........................................")
@@ -222,6 +209,6 @@ if __name__ == '__main__':
     Ti_Tally(9,sk[8])
     Ti_Tally(10,sk[9])
     """
-    Tally(temp_t, m)  # 链上唱票
-
+    # Tally(temp_t ,m)  #链上唱票
+    Tally(m)  # 链上唱票
     print("............................................Reward phase...........................................")

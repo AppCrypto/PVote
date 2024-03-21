@@ -58,7 +58,7 @@ keccak_256 = Web3.solidityKeccak
 H0=(9727523064272218541460723335320998459488975639302513747055235660443850046724,5031696974169251245229961296941447383441169981934237515842977230762345915487)
 H1=(5031696974169251245229961296941447383441169981934237515842977230762345915487,9727523064272218541460723335320998459488975639302513747055235660443850046724)
 """
-H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909) #生成元H1
+H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)  # 生成元H1
 
 
 def random_scalar() -> int:  # Generate random numbers
@@ -68,7 +68,7 @@ def random_scalar() -> int:  # Generate random numbers
 
 
 def Point2IntArr(x):  # tuple/list transform to int[]
-    ints = [int(num) for num in x]  #数据转换
+    ints = [int(num) for num in x]  # 数据转换
     return ints
 
 
@@ -89,7 +89,8 @@ def Setup(n, t):  # PVSS Key Generation   #PVSS的公私钥产生，注意有效
 def share_secret(secret: int, sharenum: int, threshold: int) -> Dict[
     int, int]:  # PVSS.Share(s,n,t) n is sharenum value .t is threshold value
     coefficients = [secret] + [random_scalar() for j in range(threshold)]
-    #Shamir 分享
+
+    # Shamir 分享
     def f(x: int) -> int:
         """ evaluation function for secret polynomial
         """
@@ -105,7 +106,7 @@ def share_secret(secret: int, sharenum: int, threshold: int) -> Dict[
 def Dateconvert(res, n):  # Data conversion functions for bilinear pairing on-chain
     c1 = [0]
     c2 = [0]
-    #数据格式转换，将c(x,y)分开放入单组的数组中
+    # 数据格式转换，将c(x,y)分开放入单组的数组中
     v1 = [0]
     v2 = [0]
     # 数据格式转换，将v(x,y)分开放入单组的数组中
@@ -119,7 +120,7 @@ def Dateconvert(res, n):  # Data conversion functions for bilinear pairing on-ch
 
 def Share(s_j, H1, pk, n, t):
     SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
-    #注意数组第一位为0，v，c数组长度为n+1
+    # 注意数组第一位为0，v，c数组长度为n+1
     v = [0]
     c = [0]
     DLEQ_Proof = [0]
@@ -127,12 +128,12 @@ def Share(s_j, H1, pk, n, t):
     c.extend([multiply(pk[i], SSShare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
 
     DLEQ_Proof.extend([DLEQ(H1, v[i + 1], pk[i], c[i + 1], SSShare[i + 1]) for i in range(0, n)])
-    #DLEQ的Proof为证明v，c确实是由该多项式f(x)所生成,例如s_i=f(i)。
+    # DLEQ的Proof为证明v，c确实是由该多项式f(x)所生成,例如s_i=f(i)。
     res = {"v": v, "c": c, "DLEQ_Proof": DLEQ_Proof}
     return res
 
 
-def DLEQ(x1, y1, x2, y2, alpha: int) -> Tuple[int, int]:  #生成DLEQ承诺 alpha为需要承诺的零知识证明的值
+def DLEQ(x1, y1, x2, y2, alpha: int) -> Tuple[int, int]:  # 生成DLEQ承诺 alpha为需要承诺的零知识证明的值
     """ DLEQ... discrete logarithm equality
         Proofs that the caller knows alpha such that y1 = x1**alpha and y2 = x2**alpha
         without revealing alpha.
@@ -157,7 +158,7 @@ def DLEQ(x1, y1, x2, y2, alpha: int) -> Tuple[int, int]:  #生成DLEQ承诺 alph
     return c, r
 
 
-def DLEQ_verify(x1, y1, x2, y2, challenge: int, response: int) -> bool: #DLEQ_Verify的链下验证函数
+def DLEQ_verify(x1, y1, x2, y2, challenge: int, response: int) -> bool:  # DLEQ_Verify的链下验证函数
     a1 = add(multiply(x1, response), multiply(y1, challenge))
     a2 = add(multiply(x2, response), multiply(y2, challenge))
     c = keccak_256(  # pylint: disable=E1120
@@ -175,14 +176,15 @@ def DLEQ_verify(x1, y1, x2, y2, challenge: int, response: int) -> bool: #DLEQ_Ve
     c = int.from_bytes(c, "big")
     return c == challenge
 
-#删除PVSS.DVerify和PVSS.PVerify，将此部分转移到链上进行
 
-def Decrypt(c_ji, sk_i):  #PVSS.Decrypt，解密函数
+# 删除PVSS.DVerify和PVSS.PVerify，将此部分转移到链上进行
+
+def Decrypt(c_ji, sk_i):  # PVSS.Decrypt，解密函数
     sh1_ji = multiply(c_ji, sympy.mod_inverse((sk_i) % CURVE_ORDER, CURVE_ORDER))
     return sh1_ji
 
 
-def Reconstruct(res, n, t):     #PVSS.Reconstruct  秘密恢复函数
+def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
     recIndex = [i + 1 for i in range(0, t + 1)]
     print(recIndex)
     sum = multiply(H1, 0)
@@ -202,22 +204,26 @@ def Reconstruct(res, n, t):     #PVSS.Reconstruct  秘密恢复函数
         sum = add(sum, multiply(res["v"][i], lagrange_coefficient(i)))
     return sum
 
-#留作测试所用
-"""                    
-if __name__ == '__main__':
-    key=Setup(10,5)
 
-    n=10
-    t=5
+# 留作测试所用
+
+if __name__ == '__main__':
+    key = Setup(10, 5)
+
+    n = 10
+    t = 5
     print("answer")
-    print(multiply(H1,233333))
+    print(multiply(H1, 233333))
     print(".........")
 
-    res1=Share(233333,H1,key["pk"],n,t)
-    sum=Reconstruct(res1,10,5)
+    res1 = Share(233333, H1, key["pk"], n, t)
+    sum = Reconstruct(res1, 10, 5)
     print(sum)
-    Reconstruct2(res1,10,5)
-"""
+    # Reconstruct2(res1,10,5)
+
+
+
+
 
 
 

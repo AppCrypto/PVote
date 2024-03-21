@@ -149,4 +149,19 @@ def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
         return (False)
 
 
+def ZKRP_verify2(V_j, n, t):        #ZKRP的链上验证
+    def Point2IntArr(x):  # tuple/list transform to int[]
+        ints = [int(num) for num in x]   #格式转换，转换成int数组，方便传入链上
+        return ints
 
+    recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
+
+    V = [Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
+    result1 = Contract.functions.ZKRP_verify1(V).call() #ZKRP.Verify的第一个等式的验证
+    result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
+    result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证
+
+    if result1 and result2 and result3:  #三个验证等式全true，ZKRP.Verify才会返回true
+        return (True)
+    else:
+        return (False)
