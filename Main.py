@@ -10,6 +10,7 @@ import time
 import ZKRP
 import PVSS
 import util
+import random
 from py_ecc.bn128 import G1, G2
 from py_ecc.bn128 import add, multiply, neg, pairing, is_on_curve
 from py_ecc.bn128 import curve_order as CURVE_ORDER
@@ -86,7 +87,7 @@ def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了�
                                 util.Point2IntArr(zkrp_proof[2]), util.Point2IntArr(zkrp_proof[3]),
                                 util.Point2IntArr(zkrp_proof[4]), zkrp_proof[5], zkrp_proof[6], zkrp_proof[7],
                                 zkrp_proof[8]).transact({'from': w3.eth.accounts[0]})
-    print("Vote done")
+    print("Vote value:", w_j)
     return shares["v"][1:]  # 给ZKRP.Verify提供V_j ,因为生成的v数组第一位为无效0，智能合约上没有像Python方便的操作
 
 
@@ -174,23 +175,15 @@ if __name__ == '__main__':
 
     #目前用的是ZKRP_verify2，还有V_ji的这部分需要继续优化
     # 第一个投票者
-    V_j1 = Vj_Vote(0, n, t)  # 投票者投票函数
-    print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())  # 链上PVSS.DVerify
-    print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_j1, n, t))  # 链上ZKRP.Verify
-    Aggreagate()  # 通过两个验证后将投票上传的数据聚合
-
-    # 第二个投票者
-    V_j2 = Vj_Vote(3, n, t)
-    print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())
-    print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_j2, n, t))
-    Aggreagate()
-
-    for i in range(0, 3):  # for循环的方式生成第3.4.5个投票者  可以调整，投票人数的加入需要和参与投票人数m对应
-        V_ji = Vj_Vote(2, n, t)
-        print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())
-        print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_ji, n, t))
-        Aggreagate()
-
+    ballot=0
+    for i in range(0, m):
+        w_j = int(random.random()*(b-a+1)+a)
+        ballot+=w_j
+        V_j1 = Vj_Vote(w_j, n, t)  # 投票者投票函数
+        print("PVSS_DVerify result:", Contract.functions.PVSS_DVerify().call())  # 链上PVSS.DVerify
+        print("ZKRP_Verify result:", ZKRP.ZKRP_verify2(V_j1, n, t))  # 链上ZKRP.Verify
+        Aggreagate()  # 通过两个验证后将投票上传的数据聚合
+    print("expected ballot value:", ballot)
     print("..........................................tallying phase...........................................")
 
     temp_t = t+1  # for循环的方式生成唱票者，每当有一个唱票者完成Ti_Tally函数，则会在链上成功上传一份解密份额，当满足t个份额时可以调用Tally函数进行唱票
