@@ -147,11 +147,11 @@ def Tally(m):  # 链上唱票，输入参数m（投票人数）是因为要确�
     # 将投票结果和投票可能值遍历做比对
     for i in range(a * m, b * m + 1):
         if (AllResult[i] != None and result[0] == AllResult[i][0] and result[1] == AllResult[i][1]):
-            print("The vote score is " + str(i + a * m))
-            return result
+            # print("The vote score is",i)
+            return i 
 
     print("No vote result")
-    return False
+    return -100000
 
 
 def ReturnDate():  # 返回当前所聚合的AGG的数据，测试所用
@@ -246,5 +246,7 @@ if __name__ == '__main__':
     # 也可以全部列出，以表示t个唱票者完成任务  ，以下例子为10个唱票者完成任务
 
     # Tally(temp_t ,m)  #链上唱票
-    Tally(m)  # 链上唱票
+    tally=Tally(m)  # 链上唱票
+    if tally==ballot:
+        print("The tallying result is correct:",tally)
     print("............................................Reward phase...........................................")
