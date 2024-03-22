@@ -1,5 +1,5 @@
 from web3 import Web3
-
+import sys
 w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:7545'))
 from solcx import compile_standard, install_solc
 
@@ -184,13 +184,12 @@ def ZKRP_verify2(n, t):  # ZKRP的链上验证
 
 if __name__ == '__main__':
 
-    print("...........................................Setup phase.............................................")
-
-    n = 10  # 唱票者人数n
+    n = int(sys.argv[1])  # 唱票者人数n
     t = int(n/2+1)  # 门限值t
+    print("...........................................Setup phase.............................................",n,t)
     starttime=time.time()
     key = PVSS.Setup(n, t)  # PVSS Key Generation
-    print("PVSS.setup of each tallier average time:", "%.2f"%((time.time()- starttime)/n*1000),"ms")
+    print("PVSS.setup of each tallier average time:", "%.2f"%((time.time()- starttime)/n*1000),"ms", "a public key size:", "%.2f"%(len(str(key["pk"]))/n),"B")
     pk = key["pk"]  # Public key array
     sk = key["sk"]  # Private key array
     pks = [util.Point2IntArr(pk[i]) for i in range(n)]  # 公钥数据格式转换
@@ -199,7 +198,8 @@ if __name__ == '__main__':
     Contract.functions.setTalliresPK(pks).transact({'from': w3.eth.accounts[0]})
     gas_estimate = Contract.functions.setTalliresPK(pks).estimateGas()
     print("Initiator setup gas cost:",gas_estimate)
-    print("Initiator setup output size:","%.2f" %(len(str(pks))/1024),"B")
+    print("Initiator setup output size:","%.2f" %(len(str(pks))/1024),"kB")
+    # exit()
     a = 0  # 投票最小范围a
     b = 5  # 投票最大范围b
     m = 3  # 参与投票人数
