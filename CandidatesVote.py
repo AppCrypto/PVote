@@ -63,17 +63,20 @@ H1 = multiply(G1, 98689969964805303507239363463880373485137071528269327163203804
 pks = []
 
 
-def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了一个投票者V_j应该完成的事务，（n，t）为秘密分享参与人数和门限值
+def Vj_VoteForCandidates(w_j: tuple, n: int, t: int):  # w_j 为 vote value  #函数定义了一个投票者V_j应该完成的事务，（n，t）为秘密分享参与人数和门限值
     s_j = PVSS.random_scalar()
     # 生成随机数
     # starttime = time.time()
-    shares = PVSS.Share(s_j, H1, pk, n, t)
+    shares = PVSS.ShareForCandidates(s_j, H1, pk, n, t)
     # t1 = time.time() - starttime
     # print("PVSS_Share spent time:", "%.2f"%(t1*1000),"ms",)
     # 调用PVSS.Share
     # print("PVSS_Share size:", "%.2f"%(len(str(shares))),"B")
     # print("PVSS_Share size:","%.2f" %(len(str(shares))/1024),"kB")
-    U_j = add(multiply(H1, w_j), multiply(G1, s_j))
+    U_j = []
+    U_j.extend([add(multiply(H1, w_j[0]), multiply(G1, s_j))])
+    # U_j.extend([add(multiply(H1, w_j[i]), multiply(G1, shares["P_j"][i]))] for i in )
+
     # 链下计算U_j
 
     # starttime2 = time.time()
@@ -207,15 +210,16 @@ if __name__ == '__main__':
     b = 5  # 投票最大范围b
     m = 1  # 参与投票人数
     GPK = ZKRP.Setup(a, b)  # ZKRP初始化
-
+    l = 2
     print("............................................Voting phase...........................................")
 
     # 目前用的是ZKRP_verify2，还有V_ji的这部分需要继续优化
     # 第一个投票者
-    ballot = 0
+    ballot = [0] * l
+    print(ballot)
     for i in range(0, m):
-        w_j = int(random.random() * (b - a + 1) + a)
-        ballot += w_j
+        w_j = [int(random.random() * (b - a + 1) + a) for i in range(l)]
+        ballot = [b + w for b, w in zip(ballot, w_j)]
         Vj_Vote(w_j, n, t)  # 投票者投票函数
         # x=1  #目前只考虑一位候选人的情况,  x上限为n/2+1
         if (Contract.functions.PVSS_DVerify().call() and Contract.functions.ZKRP_verify(n).call()):

@@ -355,10 +355,16 @@ contract DAOsForVote {
     function ZKRP_verify(uint8 t)
     public returns (bool)
     {
+        uint256[2][] memory V;
+        V=mergeArrays(VoteData.v1,VoteData.v2);
+        uint256[] memory lagrange_coefficient;
+        lagrange_coefficient = lagrangeCoefficient(t);
+        //uint elements=lagrange_coefficient.length;
+        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient);
+        bool  proof1 = ZKRP_verify1(C_j,t);
+        bool  proof2 = ZKRP_verify2();
+        bool  proof3 = ZKRP_verify3();
 
-        bool proof1 = ZKRP_verify1(t);
-        bool proof2 = ZKRP_verify2();
-        bool proof3 = ZKRP_verify3();
         return proof1 && proof2 && proof3;
     }
 
@@ -399,15 +405,10 @@ contract DAOsForVote {
 
 
      //ZKRP第一个等式的链上验证
-    function ZKRP_verify1(uint8 t)
+    function ZKRP_verify1(uint256[2] memory C_j,uint8 t)
     public returns (bool proof_is_valid)
     {
-        uint256[2][] memory V;
-        V=mergeArrays(VoteData.v1,VoteData.v2);
-        uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient(t);
-        //uint elements=lagrange_coefficient.length;
-        uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient);
+
         uint256[2] memory temp;
         uint256[2] memory temp2;
         uint256[2] memory temp3;
@@ -527,5 +528,16 @@ contract DAOsForVote {
         //G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
+
+    function ZKRP_ForGasTest(uint8 t) public returns (uint256[2] memory C_j)
+    {
+        uint256[2][] memory V;
+        V=mergeArrays(VoteData.v1,VoteData.v2);
+        uint256[] memory lagrange_coefficient;
+        lagrange_coefficient = lagrangeCoefficient(t);
+        //uint elements=lagrange_coefficient.length;
+        C_j = Interpolate(V, lagrange_coefficient);
+    }
+
 
 }

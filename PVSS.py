@@ -191,8 +191,23 @@ def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
     return sum
 
 
-# 留作测试所用
+def ShareForCandidates(s_j, H1, pk, n, t):
+    SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
+    # 注意数组第一位为0，v，c数组长度为n+1
+    v = [0]
+    c = [0]
+    DLEQ_Proof = [0]
+    v.extend([multiply(H1, SSShare[i + 1]) for i in range(0, n)])  # v_i=H1^s_i
+    c.extend([multiply(pk[i], SSShare[i + 1]) for i in range(0, n)])  # c_i=pk_i^s_i
 
+    DLEQ_Proof.extend([DLEQ(H1, v[i + 1], pk[i], c[i + 1], SSShare[i + 1]) for i in range(0, n)])
+    # DLEQ的Proof为证明v，c确实是由该多项式f(x)所生成,例如s_i=f(i)。
+    res = {"v": v[1:], "c": c[1:], "DLEQ_Proof": DLEQ_Proof[1:], "P_j": SSShare}
+    return res
+
+
+# 留作测试所用
+"""
 if __name__ == '__main__':
     key = Setup(10, 5)
     print(Contract.functions.lagrangeCoefficient2(5).call())
@@ -205,10 +220,10 @@ if __name__ == '__main__':
 
     res1 = Share(233333, H1, key["pk"], n, t)
     print(res1)
-    # sum = Reconstruct(res1, 10, 5)
-    # print(sum)
+    #sum = Reconstruct(res1, 10, 5)
+    #print(sum)
     # Reconstruct2(res1,10,5)
-
+"""
 
 
 
