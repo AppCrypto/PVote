@@ -176,7 +176,7 @@ def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
     return sum
 
 
-def ShareForCandidates(s_j, H1, pk, n, t):   #为委员会投票提供的Share，提供P_j（f（1）至f（n））数组
+def ShareForCandidates(s_j, H1, pk, n, t):   #为多候选人准备的PVSS.Share 多暴露了f(0)-f(n),用于U_jk的生成
     SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
     # 注意数组第一位为0，v，c数组长度为n+1
     v = [0]

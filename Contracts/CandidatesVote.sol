@@ -78,10 +78,10 @@ contract CandidatesVote {
         uint256[]  c2;
         uint256[]  v1;
         uint256[]  v2;
-        uint256[]  U1;   //现在进入的是U1数组
-        uint256[]  U2;  //U2同理，长度应该为l，表示l个委员会投票承诺
+        uint256[]  U1;  //现在进入的是U1数组
+        uint256[]  U2;    //U2同理，长度应该为l，表示l个候选人投票承诺
         uint256[2][] D_Proof;
-        uint256 ulen;
+        uint256 ulen;    //表示为候选人l
     }
 
     struct ZKRP_Proof  //一个保存ZKRP_Proof数据的数据结构类型
@@ -208,7 +208,7 @@ contract CandidatesVote {
             AGGPointV[i]=bn128_add([VoteData.v1[i], VoteData.v2[i], AGGPointV[i][0], AGGPointV[i][1]]);
         }
 
-        for(uint i=0; i<VoteData.ulen; i++)  //对l个U_jk进行聚合
+        for(uint i=0; i<VoteData.ulen; i++)    //对l个U_jk进行聚合
         {
             AGGPointU[i]=bn128_add([VoteData.U1[i],VoteData.U2[i],AGGPointU[i][0],AGGPointU[i][1]]);
         }
@@ -508,7 +508,7 @@ contract CandidatesVote {
 	    return result[0];
 	}
 
-    //目前使用的是这个，我晚上回来继续修改，生成朗日插值系数函数(生成拉格朗日插值并返回), x是恢复f(x),当x取0时为f(0),即s_j
+    //链上拉格朗日插值，返回为f（x）的值，x取0表示f（0）
     function lagrangeCoefficient(uint256 x, uint256 t) public returns (uint256[] memory){
 
         uint256[] memory lar2 = new uint256[](t);
@@ -531,7 +531,7 @@ contract CandidatesVote {
         return lar2;
     }
 
-    //链上唱票函数,这次不再需要任何参数的链下输入, i为第几位委员会唱票，利用的是第i个聚合U_jk
+    //链上唱票函数,不需要任何参数的链下输入   i为第i位候选人唱票，利用的是第i个聚合U_jk
     function Tally(uint8 i)
     public returns(uint256[2] memory)
     {
@@ -543,16 +543,17 @@ contract CandidatesVote {
         //G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
-
+    //测试的时候再把注释解开，不然超出智能合约最大size，会出现报错
     /*
-    function ZKRP_ForGasTest(uint8 t) public returns (uint256[2] memory C_j)
+    function ZKRP_ForGasTest(uint8 x,uint8 t) public returns (uint256[2] memory C_j)
     {
         uint256[2][] memory V;
         V=mergeArrays(VoteData.v1,VoteData.v2);
         uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient(t);
+        lagrange_coefficient = lagrangeCoefficient(x,t);
         //uint elements=lagrange_coefficient.length;
         C_j = Interpolate(V, lagrange_coefficient);
     }
     */
+
 }

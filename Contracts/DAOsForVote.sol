@@ -493,7 +493,7 @@ contract DAOsForVote {
 	    return result[0];
 	}
 
-    //目前使用的是这个，我晚上回来继续修改，生成朗日插值系数函数(生成拉格朗日插值并返回)
+    //生成朗日插值系数函数(生成拉格朗日插值并返回)
     function lagrangeCoefficient(uint256 t) public returns (uint256[] memory){
 
         uint256[] memory lar2 = new uint256[](t);
