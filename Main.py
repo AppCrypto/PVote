@@ -88,7 +88,7 @@ def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了�
         temp = util.Point2IntArr(shares["DLEQ_Proof"][i])
         dleq_proof.extend([temp])
     # 为DLEQ Proof数据格式转换
-    agg = PVSS.Dateconvert(shares, n)  # Data transformation  数据转换
+    agg = util.Dataconvert(shares, n)  # Data transformation  数据转换
     # 将投票者生成的 PVSS.Share的v，c数组，dleq_proof数组，U_j传输到智能合约上
     Contract.functions.PVSStoSC(agg["c1"], agg["c2"], agg["v1"], agg["v2"], int(U_j[0]), int(U_j[1]),
                                 dleq_proof).transact({'from': w3.eth.accounts[0]})

@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 
-contract DAOsForVote {
+contract CandidatesVote {
     ////////////////////////////////////////////////////////////////////////////////////////////////
     //// CRYPTOGRAPHIC CONSTANTS
 
@@ -44,14 +44,14 @@ contract DAOsForVote {
 
 
 
-    uint256[2]   AGGPointU;   //存储Aggregate之后的数据U*
+    uint256[2][] AGGPointU;   //存储Aggregate之后的数据U*
     uint256[2][] AGGPointC;   //存储Aggregate之后的数据C*
     uint256[2][] AGGPointV;   //存储Aggregate之后的数据V*
     uint256[2][] Tallires_pk;
     uint256[2][] DecryptedShare;
 
     constructor() {
-        AGGPointU = [0,0]; // 在构造函数中为该数组赋值
+        //AGGPointU = [0,0]; // 在构造函数中为该数组赋值
         uint256[2] memory temp;
         temp[0]=0;
         temp[1]=0;   // Initialize G1Point
@@ -62,21 +62,26 @@ contract DAOsForVote {
             uint256[2] memory newStruct = temp;
             AGGPointC.push(newStruct);
             AGGPointV.push(newStruct);
+
+        }
+        for (uint i=0 ; i< Tallires/2+1; i++)
+        {
+            uint256[2] memory newStruct = temp;
+            AGGPointU.push(newStruct);
         }
     }
 
 
-    struct Vote_Data  //一个保存投票数据的数据结构类型
+    struct PVSS_Data  //一个保存投票数据的数据结构类型
     {
         uint256[]  c1;
         uint256[]  c2;
         uint256[]  v1;
         uint256[]  v2;
-        uint256 U1;
-        uint256 U2;
+        uint256[]  U1;   //现在进入的是U1数组
+        uint256[]  U2;  //U2同理，长度应该为l，表示l个委员会投票承诺
         uint256[2][] D_Proof;
-        //uint256[2][] P_Proof;
-        //uint256[]  lagrangeCoefficient;
+        uint256 ulen;
     }
 
     struct ZKRP_Proof  //一个保存ZKRP_Proof数据的数据结构类型
@@ -90,23 +95,27 @@ contract DAOsForVote {
         uint256 z1;
         uint256 z2;
         uint256 z3;
+        uint256 U1;
+        uint256 U2;
     }
 
-    Vote_Data public VoteData;   //生成实例
+
+    PVSS_Data  public VoteData;   //生成实例
     ZKRP_Proof public ZKRPProof;
 
-    function PVSStoSC(uint256[] memory  _c1 , uint256[] memory _c2, uint256[] memory _v1, uint256[] memory _v2, uint256 _U1, uint256 _U2, uint256[2][] memory _D_Proof)
+    function PVSStoSC(uint256[] memory  _c1 , uint256[] memory _c2, uint256[] memory _v1, uint256[] memory _v2, uint256[] memory _U1, uint256[] memory _U2, uint256[2][] memory _D_Proof, uint256 _ulen)
     public
     {   // 实例化结构体并赋值
         //上传投票数据到链上的函数，为VoteData赋值
-        VoteData = Vote_Data({
+        VoteData = PVSS_Data({
             c1: _c1,
             c2: _c2,
             v1: _v1,
             v2: _v2,
             U1: _U1,
             U2: _U2,
-            D_Proof: _D_Proof
+            D_Proof: _D_Proof,
+            ulen: _ulen
             //lagrangeCoefficient: _lagrangeCoefficient  , uint256[] memory _lagrangeCoefficient
         });
 
@@ -122,7 +131,9 @@ contract DAOsForVote {
         uint256 _c,
         uint256 _z1,
         uint256 _z2,
-        uint256 _z3
+        uint256 _z3,
+        uint256 _u1,
+        uint256 _u2
     ) public { ///为ZKRP Proof 赋值，上传Proof到链上的函数
         ZKRPProof = ZKRP_Proof({
             E_j: _E_j,
@@ -133,7 +144,9 @@ contract DAOsForVote {
             c: _c,
             z1: _z1,
             z2: _z2,
-            z3: _z3
+            z3: _z3,
+            U1:_u1,
+            U2:_u2
         });
     }
 
@@ -177,10 +190,6 @@ contract DAOsForVote {
         return (DecryptedShare,DecryptedShare.length);
     }
 
-     //返回当前已经聚合了的数据的函数
-    function ReturnData() public  returns (uint256[2][] memory, uint256[2][] memory, uint256[2] memory) {
-        return (AGGPointC, AGGPointV, AGGPointU);
-    }
 
      //返回目前聚合了的c数组，测试所用
     function ReturnPointC() public returns(uint[2][] memory)
@@ -198,7 +207,12 @@ contract DAOsForVote {
             AGGPointC[i]=bn128_add([VoteData.c1[i], VoteData.c2[i], AGGPointC[i][0], AGGPointC[i][1]]);
             AGGPointV[i]=bn128_add([VoteData.v1[i], VoteData.v2[i], AGGPointV[i][0], AGGPointV[i][1]]);
         }
-        AGGPointU=bn128_add([VoteData.U1,VoteData.U2,AGGPointU[0],AGGPointU[1]]);
+
+        for(uint i=0; i<VoteData.ulen; i++)  //对l个U_jk进行聚合
+        {
+            AGGPointU[i]=bn128_add([VoteData.U1[i],VoteData.U2[i],AGGPointU[i][0],AGGPointU[i][1]]);
+        }
+
     }
 
     function P1() pure internal returns (G1Point memory) {
@@ -352,13 +366,13 @@ contract DAOsForVote {
     }
 
 
-    function ZKRP_verify(uint8 t)
+    function ZKRP_verify(uint8 x, uint8 t)
     public returns (bool)
     {
         uint256[2][] memory V;
         V=mergeArrays(VoteData.v1,VoteData.v2);
         uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient(t);
+        lagrange_coefficient = lagrangeCoefficient(x,t);
         //uint elements=lagrange_coefficient.length;
         uint256[2] memory  C_j = Interpolate(V, lagrange_coefficient);
         bool  proof1 = ZKRP_verify1(C_j,t);
@@ -366,6 +380,7 @@ contract DAOsForVote {
         bool  proof3 = ZKRP_verify3();
 
         return proof1 && proof2 && proof3;
+        //return (proof1,proof2,proof3);
     }
 
 
@@ -427,7 +442,7 @@ contract DAOsForVote {
         uint256[2] memory temp3;
         uint256[2] memory temp4;
 
-        temp2 = bn128_multiply([VoteData.U1, VoteData.U2, ZKRPProof.c]);
+        temp2 = bn128_multiply([ZKRPProof.U1, ZKRPProof.U2, ZKRPProof.c]);
         temp3 = bn128_multiply([G1x, G1y, ZKRPProof.z3]);
         temp4 = bn128_multiply([H1x, H1y, ZKRPProof.z1]);
 
@@ -493,8 +508,8 @@ contract DAOsForVote {
 	    return result[0];
 	}
 
-    //目前使用的是这个，我晚上回来继续修改，生成朗日插值系数函数(生成拉格朗日插值并返回)
-    function lagrangeCoefficient(uint256 t) public returns (uint256[] memory){
+    //目前使用的是这个，我晚上回来继续修改，生成朗日插值系数函数(生成拉格朗日插值并返回), x是恢复f(x),当x取0时为f(0),即s_j
+    function lagrangeCoefficient(uint256 x, uint256 t) public returns (uint256[] memory){
 
         uint256[] memory lar2 = new uint256[](t);
         uint256 result = 1;
@@ -507,7 +522,7 @@ contract DAOsForVote {
                 if (i != j) {
                     //inverse = inv((j.sub(i)).mod(GROUP_ORDER), GROUP_ORDER);
                     inverse = inv(((j+GROUP_ORDER-i)%GROUP_ORDER), GROUP_ORDER);//%GROUP_ORDER
-                    intermediate_result = mulmod(j,inverse,GROUP_ORDER);
+                    intermediate_result = mulmod((j+GROUP_ORDER-x),inverse,GROUP_ORDER);
                     result = mulmod(result,intermediate_result,GROUP_ORDER);
                 }
             }
@@ -516,19 +531,20 @@ contract DAOsForVote {
         return lar2;
     }
 
-    //链上唱票函数,这次不再需要任何参数的链下输入
-    function Tally()
+    //链上唱票函数,这次不再需要任何参数的链下输入, i为第几位委员会唱票，利用的是第i个聚合U_jk
+    function Tally(uint8 i)
     public returns(uint256[2] memory)
     {
         uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient(DecryptedShare.length);
+        lagrange_coefficient = lagrangeCoefficient(i,DecryptedShare.length);
         uint256[2] memory G1ACC;
         G1ACC =  Interpolate(DecryptedShare, lagrange_coefficient);
-        G1ACC =  bn128_add([AGGPointU[0], AGGPointU[1], G1ACC[0], G1neg(G1ACC[1])]);
+        G1ACC =  bn128_add([AGGPointU[i][0], AGGPointU[i][1], G1ACC[0], G1neg(G1ACC[1])]);
         //G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
 
+    /*
     function ZKRP_ForGasTest(uint8 t) public returns (uint256[2] memory C_j)
     {
         uint256[2][] memory V;
@@ -538,5 +554,5 @@ contract DAOsForVote {
         //uint elements=lagrange_coefficient.length;
         C_j = Interpolate(V, lagrange_coefficient);
     }
-
+    */
 }

@@ -99,21 +99,6 @@ def share_secret(secret: int, sharenum: int, threshold: int) -> Dict[
     return shares
 
 
-def Dateconvert(res, n):  # Data conversion functions for bilinear pairing on-chain
-    c1 = []
-    c2 = []
-    # 数据格式转换，将c(x,y)分开放入单组的数组中
-    v1 = []
-    v2 = []
-    # 数据格式转换，将v(x,y)分开放入单组的数组中
-    # #注意，因为Share的c，v从1开始为有效数据，所以输出的数组第一位都为0
-    c1.extend(int(res["c"][i][0]) for i in range(0, n))
-    c2.extend(int(res["c"][i][1]) for i in range(0, n))
-    v1.extend(int(res["v"][i][0]) for i in range(0, n))
-    v2.extend(int(res["v"][i][1]) for i in range(0, n))
-    return {"c1": c1, "c2": c2, "v1": v1, "v2": v2}  # c1 is x of c, c2 is y of c. And v1,v2,s1,s2 so on...
-
-
 def Share(s_j, H1, pk, n, t):
     SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
     # 注意数组第一位为0，v，c数组长度为n+1
@@ -191,7 +176,7 @@ def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
     return sum
 
 
-def ShareForCandidates(s_j, H1, pk, n, t):
+def ShareForCandidates(s_j, H1, pk, n, t):   #为委员会投票提供的Share，提供P_j（f（1）至f（n））数组
     SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
     # 注意数组第一位为0，v，c数组长度为n+1
     v = [0]
