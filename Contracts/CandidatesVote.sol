@@ -78,10 +78,10 @@ contract CandidatesVote {
         uint256[]  c2;
         uint256[]  v1;
         uint256[]  v2;
-        uint256[]  U1;  //现在进入的是U1数组
+        uint256[]  U1;   //现在进入的是U1数组
         uint256[]  U2;    //U2同理，长度应该为l，表示l个候选人投票承诺
         uint256[2][] D_Proof;
-        uint256 ulen;    //表示为候选人l
+        uint256 ulen;
     }
 
     struct ZKRP_Proof  //一个保存ZKRP_Proof数据的数据结构类型
@@ -531,7 +531,7 @@ contract CandidatesVote {
         return lar2;
     }
 
-    //链上唱票函数,不需要任何参数的链下输入   i为第i位候选人唱票，利用的是第i个聚合U_jk
+    //链上唱票函数,这次不再需要任何参数的链下输入,  i为第i位候选人唱票，利用的是第i个聚合U_jk
     function Tally(uint8 i)
     public returns(uint256[2] memory)
     {

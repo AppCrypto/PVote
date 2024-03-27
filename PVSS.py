@@ -176,7 +176,7 @@ def Reconstruct(res, n, t):  # PVSS.Reconstruct  秘密恢复函数
     return sum
 
 
-def ShareForCandidates(s_j, H1, pk, n, t):   #为多候选人准备的PVSS.Share 多暴露了f(0)-f(n),用于U_jk的生成
+def ShareForCandidates(s_j, H1, pk, n, t):
     SSShare = share_secret(s_j, n, t)  # voter PVSS.share=(v,c)
     # 注意数组第一位为0，v，c数组长度为n+1
     v = [0]
@@ -190,12 +190,38 @@ def ShareForCandidates(s_j, H1, pk, n, t):   #为多候选人准备的PVSS.Share
     res = {"v": v[1:], "c": c[1:], "DLEQ_Proof": DLEQ_Proof[1:], "P_j": SSShare}
     return res
 
+    # reed solomon check
+
+
+def RScodeVerify(res):
+    # print(len(res))
+    def coefficient(i: int) -> int:
+        result = 1
+        for j in range(1, len(res) + 1):
+            # print(j)
+            # j=j-1
+            if i != j:
+                result *= sympy.mod_inverse((i - j) % CURVE_ORDER, CURVE_ORDER)
+                result %= CURVE_ORDER
+        return result
+
+    codeword = []
+    for i in range(1, len(res) + 1):
+        codeword.append(coefficient(i) % CURVE_ORDER)
+    sum = multiply(H1, 1)
+    for i in range(0, len(res)):
+        sum = add(sum, multiply(res[i], codeword[i]))
+    if (sum == H1):
+        return 1
+    else:
+        return 0
+    #   sum=add(sum, multiply(res["v"][i], lagrange_coefficient(i)))
+
 
 # 留作测试所用
 """
 if __name__ == '__main__':
     key = Setup(10, 5)
-    print(Contract.functions.lagrangeCoefficient2(5).call())
 
     n = 10
     t = 5
@@ -204,7 +230,8 @@ if __name__ == '__main__':
     print(".........")
 
     res1 = Share(233333, H1, key["pk"], n, t)
-    print(res1)
+    #print(res1)
+    print(RScodeVerify(res1["v"]))
     #sum = Reconstruct(res1, 10, 5)
     #print(sum)
     # Reconstruct2(res1,10,5)

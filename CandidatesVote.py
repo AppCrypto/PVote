@@ -62,8 +62,9 @@ pk_I = multiply(G2, sk_I)
 H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)  # 生成元H1
 pks = []
 
-#多候选人投票
+
 def Vj_VoteForCandidates(w_j: tuple, n: int, t: int):  # w_j 为 vote value  #函数定义了一个投票者V_j应该完成的事务，（n，t）为秘密分享参与人数和门限值
+    starttime2 = time.time()
     s_j = PVSS.random_scalar()
     # 生成随机数
     # starttime = time.time()
@@ -73,13 +74,12 @@ def Vj_VoteForCandidates(w_j: tuple, n: int, t: int):  # w_j 为 vote value  #�
     # 调用PVSS.Share
     # print("PVSS_Share size:", "%.2f"%(len(str(shares))),"B")
     # print("PVSS_Share size:","%.2f" %(len(str(shares))/1024),"kB")
-    U_j = [] #将l个候选人的承诺值U_jk放入U_j数组中
+    U_j = []
     U_j.extend([add(multiply(H1, w_j[0]), multiply(G1, s_j))])
     for i in range(1, len(w_j)):
         U_j.extend([add(multiply(H1, w_j[i]), multiply(G1, shares["P_j"][i]))])
     # print(U_j)
     # 链下计算U_j
-    # 为这l个U_jk生成对应的ZKRP_Proof并一同放入 zkrp_proof数组中
     zkrp_proof = []
 
     # starttime2 = time.time()
@@ -102,15 +102,23 @@ def Vj_VoteForCandidates(w_j: tuple, n: int, t: int):  # w_j 为 vote value  #�
     # 为DLEQ Proof数据格式转换
     agg = util.Dataconvert(shares, n)  # Data transformation  数据转换
     ugg = util.U_jdataconvert(U_j)
+    # t2 = time.time() - starttime2
+    # gas=0
+    # print("PVSS_Share spent time:", "%.2f"%(t2*1000),"ms",)
     # 将投票者生成的 PVSS.Share的v，c数组，dleq_proof数组，U_j传输到智能合约上
     Contract.functions.PVSStoSC(agg["c1"], agg["c2"], agg["v1"], agg["v2"], ugg["U_j1"], ugg["U_j2"],
                                 dleq_proof, len(w_j)).transact({'from': w3.eth.accounts[0]})
+    """
+    gas=Contract.functions.PVSStoSC(agg["c1"], agg["c2"], agg["v1"], agg["v2"], ugg["U_j1"], ugg["U_j2"],
+                                dleq_proof,len(w_j)).estimateGas()
+                                """
     print("Vote value:", w_j)
 
-    # gas=ZKRP_verify_GasEstimateTest1(1,n)  #用作ZKRP.Verify的gas验证
-    # gasall=gas["2"]  #用作ZKRP.Verify的gas验证
+    # gas=ZKRP_verify_GasEstimateTest1(1,n)
+    # gasall=gas["2"]
+    # print("gas1",gas["2"])
     for i in range(0, len(w_j)):
-        # 该投票者V_j对这l个候选人的ZKRP_Proof轮流进行验证
+
         # 将投票者生成的ZKRP.Prove生成的Proof传输到智能合约上
         Contract.functions.ZKRPtoSC(util.Point2IntArr(zkrp_proof[i][0]), util.Point2IntArr(zkrp_proof[i][1]),
                                     util.Point2IntArr(zkrp_proof[i][2]), util.Point2IntArr(zkrp_proof[i][3]),
@@ -118,13 +126,20 @@ def Vj_VoteForCandidates(w_j: tuple, n: int, t: int):  # w_j 为 vote value  #�
                                     zkrp_proof[i][7],
                                     zkrp_proof[i][8], int(U_j[i][0]), int(U_j[i][1])).transact(
             {'from': w3.eth.accounts[0]})
-        # gasall+=ZKRP_verify_GasEstimateTest2(gas["1"],n)   #用作ZKRP.Verify的gas验证
+        """
+        gas+= Contract.functions.ZKRPtoSC(util.Point2IntArr(zkrp_proof[i][0]), util.Point2IntArr(zkrp_proof[i][1]),
+                                    util.Point2IntArr(zkrp_proof[i][2]), util.Point2IntArr(zkrp_proof[i][3]),
+                                    util.Point2IntArr(zkrp_proof[i][4]), zkrp_proof[i][5], zkrp_proof[i][6], zkrp_proof[i][7],
+                                    zkrp_proof[i][8],int(U_j[i][0]), int(U_j[i][1])).estimateGas()
+        #gasall+=ZKRP_verify_GasEstimateTest2(gas["1"],n)
+        """
+        # print("gas2",ZKRP_verify_GasEstimateTest2(gas["1"],n))
         if (Contract.functions.ZKRP_verify(i, n).call() != True):
-            print("ZKRP_Verify failue", i)   #报告第几个ZKRP_Proof没有通过ZKRP.Verify验证
+            print("ZKRP_Verify failue", i, Contract.functions.ZKRP_verify(i, n).call())
             return -1
-
-    # print(gasall)   #用作ZKRP.Verify的gas验证
-    return 1   #全部正确则返回1，提前在这部分进行了ZKRP_Verify
+    # print("gas",gas)
+    # print(gasall)
+    return 1, shares["v"]
 
 
 def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i应该完成的事务
@@ -149,6 +164,7 @@ def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i�
     # 把解密份额和P_Proof上传到链上，通过验证后则将解密份额保留在链上DecryptedShare数组中
     Contract.functions.Decrypted_SharetoSC(No, util.Point2IntArr(sh1), util.Point2IntArr(proof)).transact(
         {'from': w3.eth.accounts[0]})
+
     """
     gas_estimate = Contract.functions.Decrypted_SharetoSC(No, util.Point2IntArr(sh1),
                                                           util.Point2IntArr(proof)).estimateGas()
@@ -158,24 +174,26 @@ def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i�
 
 
 def Aggreagate():  # 执行一次链上的Aggregate函数，将V,C数据聚合到链上，因为v，c数据已经保留在链上了，所以无需参数输入
-    # 现在包括对U_jk数组全部数据进行聚合
+
     Contract.functions.Aggregate().transact({'from': w3.eth.accounts[0]})
     # gas_estimate = Contract.functions.Aggregate().estimateGas()
     # print("Aggregate gas cost:", gas_estimate)
     print("Aggregate done.")
 
 
-def Tally(l, m):  # 链上唱票，输入参数m（投票人数）是因为要确定投票数值范围（a*m,b*m)， l为候选人人数
+def Tally(l, m):  # 链上唱票，输入参数m（投票人数）是因为要确定投票数值范围（a*m,b*m)
 
     # 得到投票结果
     # result = []
+    # gas=0
     score = []
     AllResult = {}
     for i in range(a * m, b * m + 1):
         AllResult[i] = multiply(H1, i)
-    # 将投票结果和投票可能值遍历做比对
+
     for i in range(0, l):
-        result = Contract.functions.Tally(i).call()  #得出每一个候选人的投票总结果
+        # gas+= Contract.functions.Tally(i).estimateGas()
+        result = Contract.functions.Tally(i).call()
         # gas_estimate = Contract.functions.Tally().estimateGas()
         # print("Tally gas cost:", gas_estimate)
         # 计算所有投票值的可能
@@ -183,13 +201,14 @@ def Tally(l, m):  # 链上唱票，输入参数m（投票人数）是因为要�
         for i in range(a * m, b * m + 1):
             if (AllResult[i] != None and result[0] == AllResult[i][0] and result[1] == AllResult[i][1]):
                 # print("The vote score is",i)
-                score.append(i)    #添加结果进score数组
+                score.append(i)
                 added = True
                 break
         if (not add):
-            score.append(-1)  # 没有结果则添加-1
-
+            score.append(-1)
+            # 将投票结果和投票可能值遍历做比对
     # print("No vote result")
+    # print("gas",gas)
     return score
 
 
@@ -206,13 +225,13 @@ def ReturnPK():  # 返回链上公钥，测试所用
     # print("pk-onchain:"+str(res))
 
 
-def ZKRP_verify_GasEstimateTest1(x, t):  # 测ZKRP.Verify多候选人的gas消耗
+def ZKRP_verify_GasEstimateTest1(x, t):  # 测ZKRP.Verify多委员会情况的gas消耗
     C_j = Contract.functions.ZKRP_ForGasTest(x, t).call()
     zkrp_verify_gas = Contract.functions.ZKRP_ForGasTest(x, t).estimateGas()
     return {"1": C_j, "2": zkrp_verify_gas}
 
 
-def ZKRP_verify_GasEstimateTest2(C_j, t):  #用作ZKRP.Verify1，2，3的gas验证
+def ZKRP_verify_GasEstimateTest2(C_j, t):
     # print(V)
     gas1 = Contract.functions.ZKRP_verify1(C_j, t).estimateGas()  # ZKRP.Verify的第一个等式的验证
     gas2 = Contract.functions.ZKRP_verify2().estimateGas()  # ZKRP.Verify的第二个等式的验证
@@ -242,10 +261,10 @@ if __name__ == '__main__':
     # exit()
     a = 0  # 投票最小范围a
     b = 5  # 投票最大范围b
-    m = 10  # 参与投票人数
+    m = 3  # 参与投票人数
     GPK = ZKRP.Setup(a, b)  # ZKRP初始化
     # l=int(n/2)+1
-    l = int(sys.argv[2])  #候选人人数，不超过N/2+1
+    l = int(sys.argv[2])
     print("............................................Voting phase...........................................")
 
     # 目前用的是ZKRP_verify2，还有V_ji的这部分需要继续优化
@@ -256,9 +275,9 @@ if __name__ == '__main__':
         w_j = [int(random.random() * (b - a + 1) + a) for i in range(l)]
         # print(w_j)
         ballot = [b + w for b, w in zip(ballot, w_j)]
-        zkrp = Vj_VoteForCandidates(w_j, n, t)  # 投票者投票函数 ，目前进入的w_j是一个int数组，长度为l个候选人
+        proof = Vj_VoteForCandidates(w_j, n, t)  # 投票者投票函数
         # x=1  #目前只考虑一位候选人的情况,  x上限为n/2+1
-        if (Contract.functions.PVSS_DVerify().call() and zkrp):
+        if (Contract.functions.PVSS_DVerify().call() and proof[0] and PVSS.RScodeVerify(proof[1])):
             # print("Both PVSS_DVerify result and ZKRP_Verify result return true")
             # gas_estimate1 = Contract.functions.PVSS_DVerify().estimateGas()
             # print("PVSS.DVerify gas cost:", gas_estimate1)
@@ -297,6 +316,7 @@ if __name__ == '__main__':
         Ti_Tally(i + 1, pk[i], sk[i])
     # 用完成任务的唱票者数量来代替t的恢复门限值，比如想控制9个份额参与秘密恢复，则使得9个唱票者完成任务，即调用9个唱票者函数
     # 也可以全部列出，以表示t个唱票者完成任务  ，以下例子为10个唱票者完成任务
+
     print("The tallying result is :", Tally(l, m))
     """
     # Tally(temp_t ,m)  #链上唱票

@@ -99,6 +99,7 @@ def Vj_Vote(w_j: int, n: int, t: int):  # w_j 为 vote value  #函数定义了�
                                 zkrp_proof[8]).transact({'from': w3.eth.accounts[0]})
     print("Vote value:", w_j)
     # return shares["v"][1:]  # 给ZKRP.Verify提供V_j ,因为生成的v数组第一位为无效0，智能合约上没有像Python方便的操作
+    return shares['v']  # For RScode Verify
 
 
 def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i应该完成的事务
@@ -123,6 +124,7 @@ def Ti_Tally(No: int, pk_i, sk_i):  # 函数定义了一个唱票者Tallier T_i�
     # 把解密份额和P_Proof上传到链上，通过验证后则将解密份额保留在链上DecryptedShare数组中
     Contract.functions.Decrypted_SharetoSC(No, util.Point2IntArr(sh1), util.Point2IntArr(proof)).transact(
         {'from': w3.eth.accounts[0]})
+
     """
     gas_estimate = Contract.functions.Decrypted_SharetoSC(No, util.Point2IntArr(sh1),
                                                           util.Point2IntArr(proof)).estimateGas()
@@ -199,13 +201,15 @@ if __name__ == '__main__':
     # 将公钥上传到智能合约
 
     Contract.functions.setTalliresPK(pks).transact({'from': w3.eth.accounts[0]})
+    gas = Contract.functions.setTalliresPK(pks).estimateGas()
+    # print(gas/n)
     # gas_estimate = Contract.functions.setTalliresPK(pks).estimateGas()
     # print("Initiator setup gas cost:",gas_estimate)
     # print("Initiator setup output size:","%.2f" %(len(str(pks))/1024),"kB")
     # exit()
     a = 0  # 投票最小范围a
     b = 5  # 投票最大范围b
-    m = 1  # 参与投票人数
+    m = 5  # 参与投票人数
     GPK = ZKRP.Setup(a, b)  # ZKRP初始化
 
     print("............................................Voting phase...........................................")
@@ -216,9 +220,10 @@ if __name__ == '__main__':
     for i in range(0, m):
         w_j = int(random.random() * (b - a + 1) + a)
         ballot += w_j
-        Vj_Vote(w_j, n, t)  # 投票者投票函数
+        rs = Vj_Vote(w_j, n, t)  # 投票者投票函数
         # x=1  #目前只考虑一位候选人的情况,  x上限为n/2+1
-        if (Contract.functions.PVSS_DVerify().call() and Contract.functions.ZKRP_verify(n).call()):
+        if (Contract.functions.PVSS_DVerify().call() and Contract.functions.ZKRP_verify(n).call() and PVSS.RScodeVerify(
+                rs)):
             # print("Both PVSS_DVerify result and ZKRP_Verify result return true")
             # gas_estimate1 = Contract.functions.PVSS_DVerify().estimateGas()
             # print("PVSS.DVerify gas cost:", gas_estimate1)
