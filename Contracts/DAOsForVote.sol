@@ -30,6 +30,8 @@ contract DAOsForVote {
 
     uint256 constant Tallires = 30;    //取消Init函数，需要提前设置唱票者人数，生成对应的存储空间,这里直接生成30个唱票者的空间
 
+    mapping(uint256 => uint256) public invMap;
+
     struct G1Point {
 		uint X;
 		uint Y;
@@ -40,9 +42,6 @@ contract DAOsForVote {
 		uint[2] X;
 		uint[2] Y;
 	}
-
-
-
 
     uint256[2]   AGGPointU;   //存储Aggregate之后的数据U*
     uint256[2][] AGGPointC;   //存储Aggregate之后的数据C*
@@ -63,8 +62,13 @@ contract DAOsForVote {
             AGGPointC.push(newStruct);
             AGGPointV.push(newStruct);
         }
-    }
 
+
+        for(uint256 i=(GROUP_ORDER-30)%GROUP_ORDER;i<(GROUP_ORDER+31)%GROUP_ORDER;i++)
+        {
+            invMap[i] = inv(i, GROUP_ORDER);
+        }
+    }
 
     struct Vote_Data  //一个保存投票数据的数据结构类型
     {
@@ -158,36 +162,7 @@ contract DAOsForVote {
         }
         return false;
     }
-    /*
-    //返回第i个唱票者的pk,可以优化掉，测试所用
-    function ReturnPKi(uint i) public returns(uint256[2] memory)
-    {
-        return (Tallires_pk[i-1]);
-    }
 
-     //返回投票者的v数组的函数
-    function ReturnV() public returns(uint256[] memory,uint256[] memory)
-    {
-        return (VoteData.v1,VoteData.v2);
-    }
-
-     //返回DecryptedShare数组和该数组长度的函数
-    function ReturnDS() public returns(uint256[2][] memory,uint)
-    {
-        return (DecryptedShare,DecryptedShare.length);
-    }
-
-     //返回当前已经聚合了的数据的函数
-    function ReturnData() public  returns (uint256[2][] memory, uint256[2][] memory, uint256[2] memory) {
-        return (AGGPointC, AGGPointV, AGGPointU);
-    }
-
-     //返回目前聚合了的c数组，测试所用
-    function ReturnPointC() public returns(uint[2][] memory)
-    {
-        return AGGPointC;
-    }
-    */
 
      //聚合函数，对v，c，U的聚合
     function Aggregate()
@@ -315,7 +290,7 @@ contract DAOsForVote {
             }
         }
 
-        return true;
+        return RScode_verify();
     }
 
     //链上PVSS.PVerify函数
@@ -375,14 +350,20 @@ contract DAOsForVote {
         sum[0] = H1x;
         sum[1] = H1y;
         uint256[2] memory codeword;
-        for(uint i=1;i< VoteData.v1.length+1;i++)
+        uint len = VoteData.v1.length+1;
+        uint i = 1;
+        uint j = 1;
+        uint256 result=1;
+        for(i=1;i< len;i++)
         {
-            uint256 result=1;
-            for(uint j=1; j< VoteData.v1.length+1;j++)
+            result = 1;
+            for(j=1; j< len;j++)
             {
                 if(i!=j)
                 {
-                    result=mulmod(result, inv(((i+GROUP_ORDER-j)%GROUP_ORDER), GROUP_ORDER), GROUP_ORDER);
+                    result=mulmod(result, invMap[(i+GROUP_ORDER-j)%GROUP_ORDER], GROUP_ORDER);
+
+                    //result=mulmod(result, inv(((i+GROUP_ORDER-j)%GROUP_ORDER), GROUP_ORDER), GROUP_ORDER);
                 }
             }
             //codeword.push(result);
@@ -558,15 +539,5 @@ contract DAOsForVote {
         //G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
-    /*
-    function ZKRP_ForGasTest(uint8 t) public returns (uint256[2] memory C_j)
-    {
-        uint256[2][] memory V;
-        V=mergeArrays(VoteData.v1,VoteData.v2);
-        uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient(t);
-        //uint elements=lagrange_coefficient.length;
-        C_j = Interpolate(V, lagrange_coefficient);
-    }
-    */
+
 }
