@@ -138,7 +138,7 @@ contract DAOsForVote {
     }
 
 
-    function setTalliresPK(uint256[2][] memory pk) public {  //上传唱票者公钥函数
+    function setTalliersPK(uint256[2][] memory pk) public {  //上传唱票者公钥函数
         Tallires_pk = pk; //保存到Tallires_pk数组
     }
 
@@ -158,7 +158,7 @@ contract DAOsForVote {
         }
         return false;
     }
-
+    /*
     //返回第i个唱票者的pk,可以优化掉，测试所用
     function ReturnPKi(uint i) public returns(uint256[2] memory)
     {
@@ -187,6 +187,7 @@ contract DAOsForVote {
     {
         return AGGPointC;
     }
+    */
 
      //聚合函数，对v，c，U的聚合
     function Aggregate()
@@ -367,7 +368,36 @@ contract DAOsForVote {
 
         return proof1 && proof2 && proof3;
     }
-
+    //RScode
+    function RScode_verify() public returns(bool)
+    {
+        uint256[2] memory sum;
+        sum[0] = H1x;
+        sum[1] = H1y;
+        uint256[2] memory codeword;
+        for(uint i=1;i< VoteData.v1.length+1;i++)
+        {
+            uint256 result=1;
+            for(uint j=1; j< VoteData.v1.length+1;j++)
+            {
+                if(i!=j)
+                {
+                    result=mulmod(result, inv(((i+GROUP_ORDER-j)%GROUP_ORDER), GROUP_ORDER), GROUP_ORDER);
+                }
+            }
+            //codeword.push(result);
+            codeword = bn128_multiply([VoteData.v1[i-1], VoteData.v2[i-1],result]);
+            sum=bn128_add([sum[0],sum[1],codeword[0],codeword[1]]);
+        }
+        if(sum[0]==H1x && sum[1]== H1y)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
 
      //链上插值函数
     function  Interpolate(
@@ -493,7 +523,7 @@ contract DAOsForVote {
 	    return result[0];
 	}
 
-    //生成朗日插值系数函数(生成拉格朗日插值并返回)
+
     function lagrangeCoefficient(uint256 t) public returns (uint256[] memory){
 
         uint256[] memory lar2 = new uint256[](t);
@@ -528,7 +558,7 @@ contract DAOsForVote {
         //G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
-
+    /*
     function ZKRP_ForGasTest(uint8 t) public returns (uint256[2] memory C_j)
     {
         uint256[2][] memory V;
@@ -538,5 +568,5 @@ contract DAOsForVote {
         //uint elements=lagrange_coefficient.length;
         C_j = Interpolate(V, lagrange_coefficient);
     }
-
+    */
 }

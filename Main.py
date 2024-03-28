@@ -200,8 +200,8 @@ if __name__ == '__main__':
     pks = [util.Point2IntArr(pk[i]) for i in range(n)]  # 公钥数据格式转换
     # 将公钥上传到智能合约
 
-    Contract.functions.setTalliresPK(pks).transact({'from': w3.eth.accounts[0]})
-    gas = Contract.functions.setTalliresPK(pks).estimateGas()
+    Contract.functions.setTalliersPK(pks).transact({'from': w3.eth.accounts[0]})
+    # gas=Contract.functions.setTalliresPK(pks).estimateGas()
     # print(gas/n)
     # gas_estimate = Contract.functions.setTalliresPK(pks).estimateGas()
     # print("Initiator setup gas cost:",gas_estimate)
@@ -225,8 +225,8 @@ if __name__ == '__main__':
         if (Contract.functions.PVSS_DVerify().call() and Contract.functions.ZKRP_verify(n).call() and PVSS.RScodeVerify(
                 rs)):
             # print("Both PVSS_DVerify result and ZKRP_Verify result return true")
-            # gas_estimate1 = Contract.functions.PVSS_DVerify().estimateGas()
-            # print("PVSS.DVerify gas cost:", gas_estimate1)
+            gas_estimate1 = Contract.functions.PVSS_DVerify().estimateGas()
+            print("PVSS.DVerify gas cost:", gas_estimate1)
 
             # ZKRP_verify_GasEstimateTest(int(sys.argv[2]))
             # gas_estimate2 = Contract.functions.ZKRP_verify( x,n ).estimateGas()
@@ -235,6 +235,8 @@ if __name__ == '__main__':
             #print("ZKRP.Verify gas cost:",gas_estimate2)
                 ZKRP_verify_GasEstimateTest(i,n)
             """
+            print(Contract.functions.RScode_verify().call())
+            print("RScode_verify gas cost:", Contract.functions.RScode_verify().estimateGas())
             Aggreagate()  # 通过两个验证后将投票上传的数据聚合
         else:
             print("Invalid vote value w_j......did not aggreagate in SC")
