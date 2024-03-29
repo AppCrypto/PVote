@@ -63,8 +63,8 @@ H1 = multiply(G1, 98689969964805303507239363463880373485137071528269327163203804
 pks = []
 
 
-def Vj_VoteForCandidates(w_j: tuple, n: int, t: int):  # w_j 为 vote value  #函数定义了一个投票者V_j应该完成的事务，（n，t）为秘密分享参与人数和门限值
-    starttime2 = time.time()
+def Vj_VoteForCandidates(w_j: tuple, n: int, t: int):
+    starttime2 = time.time()  # w_j 为 vote value  #函数定义了一个投票者V_j应该完成的事务，（n，t）为秘密分享参与人数和门限值
     s_j = PVSS.random_scalar()
     # 生成随机数
     # starttime = time.time()

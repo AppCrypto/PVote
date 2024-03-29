@@ -201,6 +201,7 @@ def RScodeVerify(res):
             # print(j)
             # j=j-1
             if i != j:
+                # print(i - j) #% CURVE_ORDER)
                 result *= sympy.mod_inverse((i - j) % CURVE_ORDER, CURVE_ORDER)
                 result %= CURVE_ORDER
         return result
@@ -231,11 +232,20 @@ if __name__ == '__main__':
 
     res1 = Share(233333, H1, key["pk"], n, t)
     #print(res1)
-    print(RScodeVerify(res1["v"]))
+    #print(RScodeVerify(res1["v"]))
+    print(Contract.functions.inv(0,CURVE_ORDER).call())
+    print(sympy.mod_inverse((1) % CURVE_ORDER, CURVE_ORDER))
     #sum = Reconstruct(res1, 10, 5)
     #print(sum)
     # Reconstruct2(res1,10,5)
+    def test():
+        for i in range((CURVE_ORDER-30),(CURVE_ORDER+31)):
+
+            print(i,"..........",sympy.mod_inverse((i) % CURVE_ORDER, CURVE_ORDER))
+
+    #test()
 """
+
 
 
 

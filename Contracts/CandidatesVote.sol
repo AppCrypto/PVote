@@ -4,10 +4,8 @@ pragma solidity ^0.8.0;
 contract CandidatesVote {
     ////////////////////////////////////////////////////////////////////////////////////////////////
     //// CRYPTOGRAPHIC CONSTANTS
-
+    mapping(uint256 => uint256) public invMap;
     uint256 constant GROUP_ORDER   = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    uint256 constant FIELD_MODULUS = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-
     // definition of two indepently selected generator for the groups G1 and G2 over
     // the bn128 elliptic curve
     // TODO: maybe swap generators G and H
@@ -22,11 +20,6 @@ contract CandidatesVote {
 
     uint256 constant negH1x  = 15264291051155210722230395084766962011373976396997290700295946518477517838363;
     uint256 constant negH1y  = 3826073859598224700850124235820352281425378330283437265323380276763555924265;
-
-    uint256 constant G2xx = 10857046999023057135944570762232829481370756359578518086990519993285655852781;
-    uint256 constant G2xy = 11559732032986387107991004021392285783925812861821192530917403151452391805634;
-    uint256 constant G2yx = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
-    uint256 constant G2yy = 4082367875863433681332203403145435568316851327593401208105741076214120093531;
 
     uint256 constant Tallires = 30;    //取消Init函数，需要提前设置唱票者人数，生成对应的存储空间,这里直接生成30个唱票者的空间
 
@@ -69,6 +62,11 @@ contract CandidatesVote {
             uint256[2] memory newStruct = temp;
             AGGPointU.push(newStruct);
         }
+
+        for (uint256 i= GROUP_ORDER-30 ; i< GROUP_ORDER +31; i++)
+        {
+            invMap[i+1] = inv(i+1, GROUP_ORDER);
+        }
     }
 
 
@@ -78,8 +76,8 @@ contract CandidatesVote {
         uint256[]  c2;
         uint256[]  v1;
         uint256[]  v2;
-        uint256[]  U1;   //现在进入的是U1数组
-        uint256[]  U2;    //U2同理，长度应该为l，表示l个候选人投票承诺
+        uint256[]  U1;
+        uint256[]  U2;
         uint256[2][] D_Proof;
         uint256 ulen;
     }
@@ -171,32 +169,6 @@ contract CandidatesVote {
         }
         return false;
     }
-
-    //返回第i个唱票者的pk,可以优化掉，测试所用
-    function ReturnPKi(uint i) public returns(uint256[2] memory)
-    {
-        return (Tallires_pk[i-1]);
-    }
-
-     //返回投票者的v数组的函数
-    function ReturnV() public returns(uint256[] memory,uint256[] memory)
-    {
-        return (VoteData.v1,VoteData.v2);
-    }
-
-     //返回DecryptedShare数组和该数组长度的函数
-    function ReturnDS() public returns(uint256[2][] memory,uint)
-    {
-        return (DecryptedShare,DecryptedShare.length);
-    }
-
-
-     //返回目前聚合了的c数组，测试所用
-    function ReturnPointC() public returns(uint[2][] memory)
-    {
-        return AGGPointC;
-    }
-
      //聚合函数，对v，c，U的聚合
     function Aggregate()
     public
@@ -208,7 +180,7 @@ contract CandidatesVote {
             AGGPointV[i]=bn128_add([VoteData.v1[i], VoteData.v2[i], AGGPointV[i][0], AGGPointV[i][1]]);
         }
 
-        for(uint i=0; i<VoteData.ulen; i++)    //对l个U_jk进行聚合
+        for(uint i=0; i<VoteData.ulen; i++)
         {
             AGGPointU[i]=bn128_add([VoteData.U1[i],VoteData.U2[i],AGGPointU[i][0],AGGPointU[i][1]]);
         }
@@ -314,6 +286,43 @@ contract CandidatesVote {
 		return out[0] != 0;
 	}
 
+
+    function RScode_verify() public returns(bool)
+    {
+        uint256[2] memory sum;
+        sum[0] = H1x;
+        sum[1] = H1y;
+        uint256[2] memory codeword;
+        uint len = VoteData.v1.length+1;
+        uint i = 1;
+        uint j = 1;
+        uint256 result=1;
+        for(i=1;i< len;i++)
+        {
+            result = 1;
+            for(j=1; j< len;j++)
+            {
+                if(i!=j)
+                {
+                    result=mulmod(result, invMap[i+GROUP_ORDER-j], GROUP_ORDER);
+
+                    //result=mulmod(result, inv(((i+GROUP_ORDER-j)%GROUP_ORDER), GROUP_ORDER), GROUP_ORDER);
+                }
+            }
+            //codeword.push(result);
+            codeword = bn128_multiply([VoteData.v1[i-1], VoteData.v2[i-1],result]);
+            sum=bn128_add([sum[0],sum[1],codeword[0],codeword[1]]);
+        }
+        if(sum[0]==H1x && sum[1]== H1y)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
     //链上PVSS.DVerify函数
     function PVSS_DVerify() public returns(bool)
     {
@@ -328,7 +337,7 @@ contract CandidatesVote {
             }
         }
 
-        return true;
+        return RScode_verify();
     }
 
     //链上PVSS.PVerify函数
@@ -508,7 +517,7 @@ contract CandidatesVote {
 	    return result[0];
 	}
 
-    //链上拉格朗日插值，返回为f（x）的值，x取0表示f（0）
+    //目前使用的是这个，我晚上回来继续修改，生成朗日插值系数函数(生成拉格朗日插值并返回)
     function lagrangeCoefficient(uint256 x, uint256 t) public returns (uint256[] memory){
 
         uint256[] memory lar2 = new uint256[](t);
@@ -521,7 +530,8 @@ contract CandidatesVote {
             for (uint256 j = 1; j < t+1;j++) {
                 if (i != j) {
                     //inverse = inv((j.sub(i)).mod(GROUP_ORDER), GROUP_ORDER);
-                    inverse = inv(((j+GROUP_ORDER-i)%GROUP_ORDER), GROUP_ORDER);//%GROUP_ORDER
+                    //inverse = inv(((j+GROUP_ORDER-i)%GROUP_ORDER), GROUP_ORDER);//%GROUP_ORDER
+                    inverse = invMap[j+GROUP_ORDER-i];
                     intermediate_result = mulmod((j+GROUP_ORDER-x),inverse,GROUP_ORDER);
                     result = mulmod(result,intermediate_result,GROUP_ORDER);
                 }
@@ -531,7 +541,7 @@ contract CandidatesVote {
         return lar2;
     }
 
-    //链上唱票函数,这次不再需要任何参数的链下输入,  i为第i位候选人唱票，利用的是第i个聚合U_jk
+    //链上唱票函数,这次不再需要任何参数的链下输入
     function Tally(uint8 i)
     public returns(uint256[2] memory)
     {
@@ -543,7 +553,7 @@ contract CandidatesVote {
         //G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
-    //测试的时候再把注释解开，不然超出智能合约最大size，会出现报错
+
     /*
     function ZKRP_ForGasTest(uint8 x,uint8 t) public returns (uint256[2] memory C_j)
     {

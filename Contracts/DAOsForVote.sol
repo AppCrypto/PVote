@@ -2,15 +2,10 @@ pragma solidity ^0.8.0;
 
 
 contract DAOsForVote {
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    //// CRYPTOGRAPHIC CONSTANTS
 
+    mapping(uint256 => uint256) public invMap;
     uint256 constant GROUP_ORDER   = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    uint256 constant FIELD_MODULUS = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
 
-    // definition of two indepently selected generator for the groups G1 and G2 over
-    // the bn128 elliptic curve
-    // TODO: maybe swap generators G and H
     uint256 constant G1x  = 1;
     uint256 constant G1y  = 2;
 
@@ -23,14 +18,7 @@ contract DAOsForVote {
     uint256 constant negH1x  = 15264291051155210722230395084766962011373976396997290700295946518477517838363;
     uint256 constant negH1y  = 3826073859598224700850124235820352281425378330283437265323380276763555924265;
 
-    uint256 constant G2xx = 10857046999023057135944570762232829481370756359578518086990519993285655852781;
-    uint256 constant G2xy = 11559732032986387107991004021392285783925812861821192530917403151452391805634;
-    uint256 constant G2yx = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
-    uint256 constant G2yy = 4082367875863433681332203403145435568316851327593401208105741076214120093531;
-
     uint256 constant Tallires = 30;    //取消Init函数，需要提前设置唱票者人数，生成对应的存储空间,这里直接生成30个唱票者的空间
-
-    mapping(uint256 => uint256) public invMap;
 
     struct G1Point {
 		uint X;
@@ -63,11 +51,12 @@ contract DAOsForVote {
             AGGPointV.push(newStruct);
         }
 
-
-        for(uint256 i=(GROUP_ORDER-30)%GROUP_ORDER;i<(GROUP_ORDER+31)%GROUP_ORDER;i++)
+        for (uint256 i= GROUP_ORDER-30 ; i< GROUP_ORDER +31; i++)
         {
-            invMap[i] = inv(i, GROUP_ORDER);
+            invMap[i+1] = inv(i+1, GROUP_ORDER);
         }
+
+
     }
 
     struct Vote_Data  //一个保存投票数据的数据结构类型
@@ -361,7 +350,7 @@ contract DAOsForVote {
             {
                 if(i!=j)
                 {
-                    result=mulmod(result, invMap[(i+GROUP_ORDER-j)%GROUP_ORDER], GROUP_ORDER);
+                    result=mulmod(result, invMap[i+GROUP_ORDER-j], GROUP_ORDER);
 
                     //result=mulmod(result, inv(((i+GROUP_ORDER-j)%GROUP_ORDER), GROUP_ORDER), GROUP_ORDER);
                 }
@@ -413,7 +402,6 @@ contract DAOsForVote {
 
         return mergedArray;
     }
-
 
      //ZKRP第一个等式的链上验证
     function ZKRP_verify1(uint256[2] memory C_j,uint8 t)
@@ -511,13 +499,17 @@ contract DAOsForVote {
         uint256 result = 1;
         uint256 inverse = 0;
         uint256 intermediate_result = 0;
-        for (uint256 i = 1; i< t+1 ; i++)
+        uint i =1;
+        uint j =1;
+        for ( i = 1; i< t+1 ; i++)
         {
             result=1;
-            for (uint256 j = 1; j < t+1;j++) {
+            for (j = 1; j < t+1;j++) {
                 if (i != j) {
                     //inverse = inv((j.sub(i)).mod(GROUP_ORDER), GROUP_ORDER);
-                    inverse = inv(((j+GROUP_ORDER-i)%GROUP_ORDER), GROUP_ORDER);//%GROUP_ORDER
+                    inverse = invMap[j+GROUP_ORDER-i];
+                    //inverse = invMap[(j+GROUP_ORDER-i)%GROUP_ORDER];//%GROUP_ORDER
+                    //inverse = inv((j+GROUP_ORDER-i)%GROUP_ORDER,GROUP_ORDER);
                     intermediate_result = mulmod(j,inverse,GROUP_ORDER);
                     result = mulmod(result,intermediate_result,GROUP_ORDER);
                 }
