@@ -1,5 +1,4 @@
 from web3 import Web3
-
 w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:7545'))
 from solcx import compile_standard, install_solc
 
@@ -12,11 +11,11 @@ import re
 import sympy  # Needed for mod_inverse
 from web3 import Web3
 from py_ecc.bn128 import G1, G2
-from py_ecc.bn128 import add, multiply, neg, pairing, is_on_curve
+from py_ecc.bn128 import add, multiply, neg, pairing
 from py_ecc.bn128 import curve_order as CURVE_ORDER
 from py_ecc.bn128 import field_modulus as FIELD_MODULUS
 
-H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)
+H1 = multiply(G1, 9868996996480530350723936346388037348513707152826932716320380442065450531909)  #Generator H1
 keccak_256 = Web3.solidityKeccak
 
 with open("contracts/DAOsForVote.sol", "r") as file:
@@ -38,7 +37,6 @@ compiled_sol = compile_standard(
     solc_version="0.8.0",
 )
 
-# print(compiled_sol)
 with open("compiled_code.json", "w") as file:
     json.dump(compiled_sol, file)
 # get bytecode
@@ -51,18 +49,21 @@ contract = w3.eth.contract(abi=abi, bytecode=bytecode)
 chain_id = 5777
 accounts0 = w3.eth.accounts[0]
 transaction_hash = contract.constructor().transact({'from': accounts0})
-# 等待合约部署完成
+# Wait for the contract to be deployed
 transaction_receipt = w3.eth.wait_for_transaction_receipt(transaction_hash)
-# 获取部署后的合约地址
+# Get the deployed contract address
 contract_address = transaction_receipt['contractAddress']
-# print("合约已部署，地址：", contract_address)
+# print(" contract deployed, address: ", contract_address)
 Contract = w3.eth.contract(address=contract_address, abi=abi)
 
-sk_I = 15872232885142738667420701097223674108720232256552480080547895231827275416057  #可信第三方的私钥，其中这里为投票发起者的私钥
-pk_I = multiply(G2, sk_I)  #可信第三方公钥，为投票发起者的公钥
+sk_I = 15872232885142738667420701097223674108720232256552480080547895231827275416057
+# Trusted third party's private key, where here is the vote initiator's private key
 
+pk_I = multiply(G2, sk_I)
+# Trusted third party's public key, here is the vote initiator's public key
 
-def Setup(a, b):   #ZKRP的初始化，a-b为选定的范围，为范围内的整数生成sigam_k
+def Setup(a, b):
+    # initialization of ZKRP, a-b for the selected range, generate sigam_k for the integers in the range
     sigma_k = []
     for i in range(a, b + 1):
         temp = multiply(G1, sympy.mod_inverse((sk_I + i) % CURVE_ORDER, CURVE_ORDER))
@@ -77,8 +78,16 @@ def Prove(s_j, w_j, U_j, sigma_wj):  #ZKRP.Prove 生成Proof
     m = PVSS.random_scalar()
 
     E_j = multiply(sigma_wj, v)
-    F_j1 = multiply(E_j, s)      #其中链下生成双线性配对十分漫长，将F_j拆分为两个群上的数，分别为F_j1和F_j2,上传到链上进行一次双线性配对
-    F_j2 = neg(multiply(G1, t))  #双线性配对起码占用3~5s时间 ，修改为群元素后，整个Prove生成平均只需要0.00085s
+    F_j1 = multiply(E_j, s)
+    """
+    # where the generation of bilinear pairing off the chain is very long, 
+    F_j is split into two groups of numbers, F_j1 and F_j2 respectively, 
+    and uploaded to the chain for a bilinear pairing.
+
+    Bilinear pairing takes at least 3~5s time. 
+    After modifying to group element, the whole Prove generation only takes 0.00085s on average
+    """
+    F_j2 = neg(multiply(G1, t))
     U1_j = add(multiply(H1, s), multiply(G1, m))
     C1_j = multiply(H1, m)
 
@@ -98,10 +107,10 @@ def Prove(s_j, w_j, U_j, sigma_wj):  #ZKRP.Prove 生成Proof
     z1 = (s - w_j * c) % CURVE_ORDER
     z2 = (t - v * c) % CURVE_ORDER
     z3 = (m - s_j * c) % CURVE_ORDER
-    return E_j, F_j1, F_j2, U1_j, C1_j, c, z1, z2, z3
+    return E_j, F_j1, F_j2, U1_j, C1_j, c, z1, z2, z3    #Output of one ZKRP.Prove
 
 
-def Verify(proof, V_j, U_j, s_j, pk_I):  #ZKRP的链下验证，为测试所用
+def Verify(proof, V_j, U_j, s_j, pk_I):  # off-chain  ZKRP.Verify for testing purposes
     C_j = multiply(H1, s_j)
 
     if (proof[3] != add(multiply(C_j, proof[4]), multiply(H1, proof[7]))):
@@ -119,35 +128,22 @@ def Verify(proof, V_j, U_j, s_j, pk_I):  #ZKRP的链下验证，为测试所用
 
     return 1
 
+"""
+    On-chain validation of ZKRP, saved in the on-chain solidity DAOsForVote.sol  and CandidatesVote.sol file.
 
-def ZKRP_verify(V_j, n, t):        #ZKRP的链上验证
+    The specific operation is to verify the following three verification expressions.
 
-    recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
+    function ZKRP_verify(uint8 t)
+    {
+        bool  proof1 = ZKRP_verify1(C_j,t);
+        bool  proof2 = ZKRP_verify2();
+        bool  proof3 = ZKRP_verify3();
+        return proof1 && proof2 && proof3;
+    }
 
-    lar = [util.lagrange_coefficient(i) for i in recIndex]   #转换为int[]
-    V = [util.Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
-    result1 = Contract.functions.ZKRP_verify1(V, lar).call() #ZKRP.Verify的第一个等式的验证
-    result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
-    result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证
+    function ZKRP_verify1(uint256[2] memory C_j,uint8 t)
 
-    if result1 and result2 and result3:  #三个验证等式全true，ZKRP.Verify才会返回true
-        return (True)
-    else:
-        return (False)
+    function ZKRP_verify2()
 
-
-def ZKRP_verify2(V_j, n, t):        #ZKRP的链上验证
-    recIndex = [i + 1 for i in range(0, t + 1)]  #确定t个份额的下标
-
-    V = [util.Point2IntArr(V_j[i]) for i in recIndex]  #转换为uint256[2][]
-    #print(V)
-    result1 = Contract.functions.ZKRP_verify1(V).call() #ZKRP.Verify的第一个等式的验证
-    result2 = Contract.functions.ZKRP_verify2().call()  #ZKRP.Verify的第二个等式的验证
-    result3 = Contract.functions.ZKRP_verify3().call()  #ZKRP.Verify的第三个等式的验证
-    """
-    if result1 and result2 and result3:  #三个验证等式全true，ZKRP.Verify才会返回true
-        return (True)
-    else:
-        return (False)
-    """
-    return (result1,result2,result3)
+    function ZKRP_verify3()
+"""

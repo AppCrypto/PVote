@@ -21,7 +21,10 @@ contract CandidatesVote {
     uint256 constant negH1x  = 15264291051155210722230395084766962011373976396997290700295946518477517838363;
     uint256 constant negH1y  = 3826073859598224700850124235820352281425378330283437265323380276763555924265;
 
-    uint256 constant Tallires = 30;    //取消Init函数，需要提前设置唱票者人数，生成对应的存储空间,这里直接生成30个唱票者的空间
+    uint256 constant Tallires = 30;
+    //The number of tallier needs to be set in advance to generate the corresponding storage space.
+    //Here, the space for 30 tallier is directly generated
+
 
     struct G1Point {
 		uint X;
@@ -37,19 +40,30 @@ contract CandidatesVote {
 
 
 
-    uint256[2][] AGGPointU;   //存储Aggregate之后的数据U*
-    uint256[2][] AGGPointC;   //存储Aggregate之后的数据C*
-    uint256[2][] AGGPointV;   //存储Aggregate之后的数据V*
+    //Global variables
+    uint256[2][]   AGGPointU;
+    //Store the data U* after the Aggregate
+
+    uint256[2][] AGGPointC;
+    //Store the data C* after the Aggregate
+
+    uint256[2][] AGGPointV;
+    //Store the data V* after the Aggregate
+
     uint256[2][] Tallires_pk;
+    //Stores the public key of tallier
+
     uint256[2][] DecryptedShare;
+    //Store the decryption share uploaded by the tallier
 
     constructor() {
-        //AGGPointU = [0,0]; // 在构造函数中为该数组赋值
+        // Assign values to arrays in the constructor
         uint256[2] memory temp;
         temp[0]=0;
-        temp[1]=0;   // Initialize G1Point
+        temp[1]=0;
+        // Initialize G1Point
 
-        //构造函数，生成Tallires所需的存储空间
+
 
         for (uint i = 0; i < Tallires; i++) {
             uint256[2] memory newStruct = temp;
@@ -57,32 +71,45 @@ contract CandidatesVote {
             AGGPointV.push(newStruct);
 
         }
+        // Generate storage needed by Tallires
         for (uint i=0 ; i< Tallires/2+1; i++)
         {
             uint256[2] memory newStruct = temp;
             AGGPointU.push(newStruct);
         }
+        // Initialize AGGPointU
 
         for (uint256 i= GROUP_ORDER-30 ; i< GROUP_ORDER +31; i++)
         {
             invMap[i+1] = inv(i+1, GROUP_ORDER);
         }
+        // Create a value map for inv's inverse function
     }
 
-
-    struct PVSS_Data  //一个保存投票数据的数据结构类型
+    // A data structure to hold the voting data
+    struct PVSS_Data
     {
         uint256[]  c1;
         uint256[]  c2;
+        //store c_j
+
         uint256[]  v1;
         uint256[]  v2;
+        //store v_j
+
         uint256[]  U1;
         uint256[]  U2;
+        //store U_j
+
         uint256[2][] D_Proof;
+        //store DLEQ proof
+
         uint256 ulen;
+        //length of U_j
     }
 
-    struct ZKRP_Proof  //一个保存ZKRP_Proof数据的数据结构类型
+    // A data structure type to hold ZKRP_Proof data
+    struct ZKRP_Proof
     {
         uint256[2] E_j;
         uint256[2] F_j1;
@@ -97,14 +124,16 @@ contract CandidatesVote {
         uint256 U2;
     }
 
+    PVSS_Data public VoteData;
+    // Generate the instance  VoteData
 
-    PVSS_Data  public VoteData;   //生成实例
     ZKRP_Proof public ZKRPProof;
+    // Generate the instance  ZKRPProof
 
+    // This is the function that uploads the vote data to the chain and assigns a value to VoteData
     function PVSStoSC(uint256[] memory  _c1 , uint256[] memory _c2, uint256[] memory _v1, uint256[] memory _v2, uint256[] memory _U1, uint256[] memory _U2, uint256[2][] memory _D_Proof, uint256 _ulen)
     public
-    {   // 实例化结构体并赋值
-        //上传投票数据到链上的函数，为VoteData赋值
+    {   // instantiate struct and assign value
         VoteData = PVSS_Data({
             c1: _c1,
             c2: _c2,
@@ -114,12 +143,13 @@ contract CandidatesVote {
             U2: _U2,
             D_Proof: _D_Proof,
             ulen: _ulen
-            //lagrangeCoefficient: _lagrangeCoefficient  , uint256[] memory _lagrangeCoefficient
+
         });
 
 
     }
 
+     // This is the function that assigns ZKRP Proof and uploading Proof onto the chain
     function ZKRPtoSC(
         uint256[2] memory _E_j,
         uint256[2] memory _F_j1,
@@ -132,7 +162,7 @@ contract CandidatesVote {
         uint256 _z3,
         uint256 _u1,
         uint256 _u2
-    ) public { ///为ZKRP Proof 赋值，上传Proof到链上的函数
+    ) public { // instantiate struct and assign value
         ZKRPProof = ZKRP_Proof({
             E_j: _E_j,
             F_j1: _F_j1,
@@ -148,18 +178,19 @@ contract CandidatesVote {
         });
     }
 
-
-    function setTalliresPK(uint256[2][] memory pk) public {  //上传唱票者公钥函数
-        Tallires_pk = pk; //保存到Tallires_pk数组
+    // Upload voter public key function and save to Tallires_pk array
+    function setTalliersPK(uint256[2][] memory pk) public {
+        Tallires_pk = pk;
     }
 
-     //下载单个所聚合的c，v的数据，No为第几个数
+    // Return a single aggregated c, v data, No is the number
     function DownloadAGGVC(uint No) public returns (uint256[2] memory, uint256[2] memory)
     {
         return (AGGPointC[No-1],AGGPointV[No-1]);
     }
 
-    //上传解密份额和dleq_Proof数据，调用PVSS_PVerify，通过则保留份额到DecryptedShare数组中
+    // Upload the decrypted share and dleq_Proof, call PVSS_PVerify,
+    // and reserve the share in the DecryptedShare array if PVSS_Verify passes.
     function Decrypted_SharetoSC(uint No, uint256[2] memory DShare, uint256[2] memory P_Proof) public returns (bool)
     {
         if(PVSS_PVerify(Tallires_pk[No-1], DShare, AGGPointC[No-1], P_Proof))
@@ -169,7 +200,8 @@ contract CandidatesVote {
         }
         return false;
     }
-     //聚合函数，对v，c，U的聚合
+
+    //Aggregate function, for v, c, U of voters
     function Aggregate()
     public
     {
@@ -188,11 +220,11 @@ contract CandidatesVote {
     }
 
     function P1() pure internal returns (G1Point memory) {
-	    return G1Point(1, 2);
+	    return G1Point(1, 2); //Generator G1
 	}
 
     function P2() pure internal returns (G2Point memory) {
-		return G2Point(
+		return G2Point( //Generator G2
 			[11559732032986387107991004021392285783925812861821192530917403151452391805634,
 			 10857046999023057135944570762232829481370756359578518086990519993285655852781],
 			[4082367875863433681332203403145435568316851327593401208105741076214120093531,
@@ -207,7 +239,7 @@ contract CandidatesVote {
             r = (q - (p % q));
 	}
 
-    //返回投票发起者的公钥，为ZKRP.Verify所用
+    // Returns the public key of the vote initiator (VI), which will be used by ZKRP.Verify
     function pk_I() pure internal returns (G2Point memory) {
 		return G2Point(
 			[410331679793378253270676581922857325978420412939832091293874594317968404676,
@@ -286,7 +318,7 @@ contract CandidatesVote {
 		return out[0] != 0;
 	}
 
-
+    //RScode verify on-chain
     function RScode_verify() public returns(bool)
     {
         uint256[2] memory sum;
@@ -305,11 +337,8 @@ contract CandidatesVote {
                 if(i!=j)
                 {
                     result=mulmod(result, invMap[i+GROUP_ORDER-j], GROUP_ORDER);
-
-                    //result=mulmod(result, inv(((i+GROUP_ORDER-j)%GROUP_ORDER), GROUP_ORDER), GROUP_ORDER);
                 }
             }
-            //codeword.push(result);
             codeword = bn128_multiply([VoteData.v1[i-1], VoteData.v2[i-1],result]);
             sum=bn128_add([sum[0],sum[1],codeword[0],codeword[1]]);
         }
@@ -323,7 +352,7 @@ contract CandidatesVote {
         }
     }
 
-    //链上PVSS.DVerify函数
+    // on-chain PVSS.DVerify function
     function PVSS_DVerify() public returns(bool)
     {
 
@@ -340,7 +369,7 @@ contract CandidatesVote {
         return RScode_verify();
     }
 
-    //链上PVSS.PVerify函数
+    // on-chain PVSS.PVerify function
     function PVSS_PVerify(uint256[2] memory pk, uint256[2] memory sh_i, uint256[2] memory c_i, uint256[2] memory Proof ) public returns(bool)
     {
         if(!DLEQ_verify([G1x,G1y],[pk[0], pk[1]],[sh_i[0],sh_i[1]],[c_i[0], c_i[1]],[Proof[0],Proof[1]]))
@@ -351,7 +380,7 @@ contract CandidatesVote {
         return true;
     }
 
-     //链上DLEQ验证
+    // on-chain DLEQ validation function
     function DLEQ_verify(
         uint256[2] memory x1, uint256[2] memory y1,
         uint256[2] memory x2, uint256[2] memory y2,
@@ -374,12 +403,16 @@ contract CandidatesVote {
         proof_is_valid = challenge == proof[0];
     }
 
-
+    // on-chain ZKRP verify function
     function ZKRP_verify(uint8 x, uint8 t)
     public returns (bool)
     {
-        uint256[2][] memory V;
-        V=mergeArrays(VoteData.v1,VoteData.v2);
+        //uint256[2][] memory V;
+        uint256[2][] memory V = new uint[2][](VoteData.v1.length);
+        for (uint i = 0; i < VoteData.v1.length; i++) {
+            V[i][0] = VoteData.v1[i];
+            V[i][1] = VoteData.v2[i];
+        }
         uint256[] memory lagrange_coefficient;
         lagrange_coefficient = lagrangeCoefficient(x,t);
         //uint elements=lagrange_coefficient.length;
@@ -393,7 +426,7 @@ contract CandidatesVote {
     }
 
 
-     //链上插值函数
+    // on-chain interpolation function
     function  Interpolate(
         uint256[2][] memory V, uint256[] memory lagrange_coefficient
     )
@@ -403,32 +436,19 @@ contract CandidatesVote {
         uint256[2] memory temp;
         a1[0] = 0;
         a1[1] = 0;
-        //uint elements=lagrange_coefficient.length;//to get the array length
+
         uint elements=lagrange_coefficient.length;
+         //to get the array length
         for(uint i=0;i<elements;i++)
         {
             temp = bn128_multiply([V[i][0], V[i][1],lagrange_coefficient[i]]);
             a1 = bn128_add([a1[0], a1[1], temp[0], temp[1]]);
         }
-        //a1=bn128_add([a1[0], a1[1], G1X, G1neg(G1Y)]); // add neg(H1)
         return a1;
     }
 
-    function mergeArrays(uint[] memory arr1, uint[] memory arr2) public  returns (uint[2][] memory) {
-        require(arr1.length == arr2.length, "Input arrays must have the same length");
 
-        uint[2][] memory mergedArray = new uint[2][](arr1.length);
-
-        for (uint i = 0; i < arr1.length; i++) {
-            mergedArray[i][0] = arr1[i];
-            mergedArray[i][1] = arr2[i];
-        }
-
-        return mergedArray;
-    }
-
-
-     //ZKRP第一个等式的链上验证
+    // on-chain verification of ZKRP first equality
     function ZKRP_verify1(uint256[2] memory C_j,uint8 t)
     public returns (bool proof_is_valid)
     {
@@ -442,7 +462,7 @@ contract CandidatesVote {
         proof_is_valid = ZKRPProof.C1_j[0] == temp[0] && ZKRPProof.C1_j[1] == temp[1];
     }
 
-     //ZKRP第二个等式的链上验证
+    // on-chain verification of ZKRP second equality
     function ZKRP_verify2()
     public returns (bool proof_is_valid)
     {
@@ -461,7 +481,7 @@ contract CandidatesVote {
         proof_is_valid=ZKRPProof.U1_j[0] == temp[0] && ZKRPProof.U1_j[1] == temp[1];
     }
 
-    //ZKRP第三个等式的链上验证，为双线性配对验证
+    // on-chain verification of ZKRP 3rd equality. Is bilinear pairing verification.
     function ZKRP_verify3()
     public returns (bool)
     {
@@ -501,7 +521,7 @@ contract CandidatesVote {
     }
 
 
-    //求逆函数，在群范围内求逆
+    // Invert function, invert in group
     function inv(uint256 a, uint256 prime) public returns (uint256){
     	return modPow(a, prime-2, prime);
     }
@@ -517,20 +537,20 @@ contract CandidatesVote {
 	    return result[0];
 	}
 
-    //目前使用的是这个，我晚上回来继续修改，生成朗日插值系数函数(生成拉格朗日插值并返回)
+    // Find the Lagrange interpolation coefficients
     function lagrangeCoefficient(uint256 x, uint256 t) public returns (uint256[] memory){
 
         uint256[] memory lar2 = new uint256[](t);
         uint256 result = 1;
         uint256 inverse = 0;
         uint256 intermediate_result = 0;
-        for (uint256 i = 1; i< t+1 ; i++)
+        uint i = 1;
+        uint j = 1;
+        for ( i = 1; i< t+1 ; i++)
         {
             result=1;
-            for (uint256 j = 1; j < t+1;j++) {
+            for ( j = 1; j < t+1;j++) {
                 if (i != j) {
-                    //inverse = inv((j.sub(i)).mod(GROUP_ORDER), GROUP_ORDER);
-                    //inverse = inv(((j+GROUP_ORDER-i)%GROUP_ORDER), GROUP_ORDER);//%GROUP_ORDER
                     inverse = invMap[j+GROUP_ORDER-i];
                     intermediate_result = mulmod((j+GROUP_ORDER-x),inverse,GROUP_ORDER);
                     result = mulmod(result,intermediate_result,GROUP_ORDER);
@@ -541,7 +561,7 @@ contract CandidatesVote {
         return lar2;
     }
 
-    //链上唱票函数,这次不再需要任何参数的链下输入
+    // on-chain tally function, no needs any off-chain input for arguments
     function Tally(uint8 i)
     public returns(uint256[2] memory)
     {
@@ -550,20 +570,7 @@ contract CandidatesVote {
         uint256[2] memory G1ACC;
         G1ACC =  Interpolate(DecryptedShare, lagrange_coefficient);
         G1ACC =  bn128_add([AGGPointU[i][0], AGGPointU[i][1], G1ACC[0], G1neg(G1ACC[1])]);
-        //G1ACC =  bn128_add([G1ACC[0], G1ACC[1], G1x, G1neg(G1y)]);
         return G1ACC;
     }
-
-    /*
-    function ZKRP_ForGasTest(uint8 x,uint8 t) public returns (uint256[2] memory C_j)
-    {
-        uint256[2][] memory V;
-        V=mergeArrays(VoteData.v1,VoteData.v2);
-        uint256[] memory lagrange_coefficient;
-        lagrange_coefficient = lagrangeCoefficient(x,t);
-        //uint elements=lagrange_coefficient.length;
-        C_j = Interpolate(V, lagrange_coefficient);
-    }
-    */
 
 }
