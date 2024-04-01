@@ -1,4 +1,4 @@
-def Point2IntArr(x):  # tuple/list transform to int[]
+def Point2IntArr(x):  # transform Point tuple/list to int[]
     ints = [int(num) for num in x]
     return ints
 

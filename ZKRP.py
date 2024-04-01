@@ -71,7 +71,7 @@ def Setup(a, b):
     return {"sk_I": sk_I, "pk_I": pk_I, "sigam_k": sigma_k}
 
 
-def Prove(s_j, w_j, U_j, sigma_wj):  #ZKRP.Prove 生成Proof
+def Prove(s_j, w_j, U_j, sigma_wj):  #ZKRP.Prove: Proof generation
     v = PVSS.random_scalar()
     s = PVSS.random_scalar()
     t = PVSS.random_scalar()

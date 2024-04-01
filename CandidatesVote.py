@@ -189,7 +189,7 @@ def Tally(l, m):
             # Compare the result of the vote with the traversal of possible vote results
     return score
 
-
+# Test multiple candidates 
 if __name__ == '__main__':
 
     n = int(sys.argv[1])

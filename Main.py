@@ -217,7 +217,7 @@ if __name__ == '__main__':
     # it will successfully upload a decryption share on the chain.
     # When t shares are met, the Tally function can be called to perform the vote
 
-    temp_t = int(sys.argv[2])
+    temp_t = t+1
     for i in range(0, temp_t):  # Set the number of tallier to be completed
         Ti_Tally(i + 1, pk[i], sk[i])
 
