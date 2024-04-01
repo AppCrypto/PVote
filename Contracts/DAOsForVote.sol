@@ -1,5 +1,6 @@
 pragma solidity ^0.8.0;
 
+// Single candidate
 contract DAOsForVote {
 
     mapping(uint256 => uint256) public invMap;
