@@ -23,3 +23,13 @@ def U_jdataconvert(U_j):  # Data format conversion to separate U (x,y) into sepa
     U_j2.extend(int(U_j[i][1]) for i in range(0, len(U_j)))
     return{"U_j1":U_j1,"U_j2":U_j2}
 
+
+def lagrange_coefficient(i: int) -> int:
+    result = 1
+    for j in recIndex:
+        # print(j)
+        # j=j-1
+        if i != j:
+            result *= j * sympy.mod_inverse((j - i) % CURVE_ORDER, CURVE_ORDER)
+            result %= CURVE_ORDER
+    return result
