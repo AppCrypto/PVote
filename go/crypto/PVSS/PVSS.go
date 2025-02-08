@@ -23,7 +23,7 @@ type SecretSharing struct {
 	//Fi []*big.Int
 	V      []*bn256.G1
 	C      []*bn256.G1
-	Proofs []*DLEQ
+	Proofs []DLEQ
 }
 
 // PVSS.Setup
@@ -37,7 +37,7 @@ func Setup(numTalliers int) ([]*big.Int, []*bn256.G1) {
 	return sks, pks
 }
 
-func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) *DLEQ {
+func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) DLEQ {
 	//生成承诺
 	r, _ := rand.Int(rand.Reader, bn256.Order)
 	rG := new(bn256.G1).ScalarMult(G, r)
@@ -59,7 +59,7 @@ func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) *DLEQ {
 	z.Sub(r, z)
 	z.Mod(z, bn256.Order)
 
-	return &DLEQ{
+	return DLEQ{
 		C:  c,
 		Z:  z,
 		RG: rG,
@@ -92,7 +92,7 @@ func Share(secret *big.Int, h *bn256.G1, pks []*bn256.G1, threshold, numShares i
 	}
 
 	//Generate the DLEQ proofs for each encrypted shares
-	proofs := make([]*DLEQ, numShares)
+	proofs := make([]DLEQ, numShares)
 	for i := 0; i < numShares; i++ {
 		proofs[i] = DLEQProof(h, pks[i], v[i], c[i], shares[i])
 	}
@@ -160,7 +160,7 @@ func DVerify(secretsharing *SecretSharing, h *bn256.G1, pks []*bn256.G1) bool {
 }
 
 // PVSS.Decrypt
-func Decrypt(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sk *big.Int) (*bn256.G1, *DLEQ) {
+func Decrypt(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sk *big.Int) (*bn256.G1, DLEQ) {
 	sh := new(bn256.G1).ScalarMult(c, sk)
 	proof := DLEQProof(h, pk, sh, c, sk)
 	return sh, proof
