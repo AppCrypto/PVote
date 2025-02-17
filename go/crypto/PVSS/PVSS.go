@@ -11,7 +11,7 @@ import (
 	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/google"
 )
 
-type DLEQ struct {
+type Proof struct {
 	C  *big.Int
 	Z  *big.Int
 	RG *bn256.G1
@@ -20,24 +20,25 @@ type DLEQ struct {
 
 // 需要运算的参数
 type SecretSharing struct {
-	//Fi []*big.Int
-	V      []*bn256.G1
-	C      []*bn256.G1
-	Proofs []DLEQ
+	BindValue []*big.Int
+	Shares    []*big.Int
+	V         []*bn256.G1
+	C         []*bn256.G1
+	Proofs    []Proof
 }
 
 // PVSS.Setup
-func Setup(numTalliers int) ([]*big.Int, []*bn256.G1) {
+func Setup(numTalliers int, g0 *bn256.G1) ([]*big.Int, []*bn256.G1) {
 	sks := make([]*big.Int, numTalliers)
 	pks := make([]*bn256.G1, numTalliers)
 	for i := 0; i < numTalliers; i++ {
 		sks[i], _ = rand.Int(rand.Reader, bn256.Order)
-		pks[i] = new(bn256.G1).ScalarBaseMult(sks[i])
+		pks[i] = new(bn256.G1).ScalarMult(g0, sks[i])
 	}
 	return sks, pks
 }
 
-func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) DLEQ {
+func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) Proof {
 	//生成承诺
 	r, _ := rand.Int(rand.Reader, bn256.Order)
 	rG := new(bn256.G1).ScalarMult(G, r)
@@ -59,7 +60,7 @@ func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) DLEQ {
 	z.Sub(r, z)
 	z.Mod(z, bn256.Order)
 
-	return DLEQ{
+	return Proof{
 		C:  c,
 		Z:  z,
 		RG: rG,
@@ -68,40 +69,47 @@ func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) DLEQ {
 }
 
 // PVSS.Share: Generate PVSS Shares({Vj},{Cj},DLEQ proofs)
-func Share(secret *big.Int, h *bn256.G1, pks []*bn256.G1, threshold, numShares int) *SecretSharing {
+func Share(secret *big.Int, h *bn256.G1, pks []*bn256.G1, threshold, numTalliers, numCandidates int) *SecretSharing {
 	coefficients := make([]*big.Int, threshold)
 	coefficients[0] = secret
 	for i := 1; i < threshold; i++ {
 		coefficients[i], _ = rand.Int(rand.Reader, bn256.Order)
 	}
-	shares := make([]*big.Int, numShares)
-	for i := 0; i < numShares; i++ {
+	bindValue := make([]*big.Int, numCandidates)
+	for i := 0; i < numCandidates; i++ {
+		x := new(big.Int).Neg(big.NewInt(int64(i)))
+		x.Mod(x, bn256.Order)
+		bindValue[i] = EvaluatePolynomial(coefficients, x, bn256.Order)
+	}
+	shares := make([]*big.Int, numTalliers)
+	for i := 0; i < numTalliers; i++ {
 		x := big.NewInt(int64(i + 1))
 		shares[i] = EvaluatePolynomial(coefficients, x, bn256.Order)
 	}
 
-	v := make([]*bn256.G1, numShares)
-	for i := 0; i < numShares; i++ {
+	v := make([]*bn256.G1, numTalliers)
+	for i := 0; i < numTalliers; i++ {
 		v[i] = new(bn256.G1).ScalarMult(h, shares[i])
 	}
 
 	//Generate the encrypted shares under talliers' public key
-	c := make([]*bn256.G1, numShares)
-	for i := 0; i < numShares; i++ {
+	c := make([]*bn256.G1, numTalliers)
+	for i := 0; i < numTalliers; i++ {
 		c[i] = new(bn256.G1).ScalarMult(pks[i], shares[i])
 	}
 
 	//Generate the DLEQ proofs for each encrypted shares
-	proofs := make([]DLEQ, numShares)
-	for i := 0; i < numShares; i++ {
+	proofs := make([]Proof, numTalliers)
+	for i := 0; i < numTalliers; i++ {
 		proofs[i] = DLEQProof(h, pks[i], v[i], c[i], shares[i])
 	}
 
 	return &SecretSharing{
-		//Shares: shares,
-		V:      v,
-		C:      c,
-		Proofs: proofs,
+		BindValue: bindValue,
+		Shares:    shares,
+		V:         v,
+		C:         c,
+		Proofs:    proofs,
 	}
 }
 
@@ -153,25 +161,20 @@ func DVerify(secretsharing *SecretSharing, h *bn256.G1, pks []*bn256.G1) bool {
 			return false
 		}
 	}
-	if !RScodeVerify(secretsharing.V, h) {
-		return false
-	}
-	return true
+	return RScodeVerify(secretsharing.V, h)
 }
 
 // PVSS.Decrypt
-func Decrypt(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sk *big.Int) (*bn256.G1, DLEQ) {
-	sh := new(bn256.G1).ScalarMult(c, sk)
-	proof := DLEQProof(h, pk, sh, c, sk)
+func Decrypt(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sk *big.Int) (*bn256.G1, Proof) {
+	skInverse := new(big.Int).ModInverse(sk, bn256.Order)
+	sh := new(bn256.G1).ScalarMult(c, skInverse)
+	proof := DLEQProof(h, sh, pk, c, sk)
 	return sh, proof
 }
 
 // PVSS.PVerify
-func PVerify(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sh *bn256.G1, proof *DLEQ) bool {
-	if !DLEQVerify(proof.C, proof.Z, h, pk, sh, c, proof.RG, proof.RH) {
-		return false
-	}
-	return true
+func PVerify(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sh *bn256.G1, proof Proof) bool {
+	return DLEQVerify(proof.C, proof.Z, h, sh, pk, c, proof.RG, proof.RH)
 }
 
 // evaluatePolynomial 在给定的 x 处计算多项式的值
