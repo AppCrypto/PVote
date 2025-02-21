@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"math/big"
 
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/google"
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 )
 
 type Proof struct {

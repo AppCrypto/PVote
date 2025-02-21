@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"math/big"
 
-	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/google"
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 )
 
 type PP struct {
@@ -20,8 +20,10 @@ type PP struct {
 type Proof struct {
 	Ej  *bn256.G1
 	Fj  *bn256.GT
-	_Uj *bn256.G1
-	_Cj *bn256.G1
+	Fj1 *bn256.G1
+	Fj2 *bn256.G1
+	Uj  *bn256.G1
+	Cj  *bn256.G1
 	C   *big.Int
 	Z1  *big.Int
 	Z2  *big.Int
@@ -80,6 +82,8 @@ func GenProof(g0 *bn256.G1, h0 *bn256.G1, g1 *bn256.G2, sj *big.Int, wj *big.Int
 	Fj1 := bn256.Pair(new(bn256.G1).Neg(new(bn256.G1).ScalarMult(Ej, _wj)), g1)
 	Fj2 := new(bn256.GT).ScalarMult(bn256.Pair(g0, g1), _b)
 	Fj := new(bn256.GT).Add(Fj1, Fj2)
+	fj1 := new(bn256.G1).Neg(new(bn256.G1).ScalarMult(Ej, _wj))
+	fj2 := new(bn256.G1).ScalarMult(g0, _b)
 
 	_Uj := new(bn256.G1).Add(new(bn256.G1).ScalarMult(h0, _wj), new(bn256.G1).ScalarMult(g0, _sj))
 
@@ -109,8 +113,10 @@ func GenProof(g0 *bn256.G1, h0 *bn256.G1, g1 *bn256.G2, sj *big.Int, wj *big.Int
 	return &Proof{
 		Ej:  Ej,
 		Fj:  Fj,
-		_Uj: _Uj,
-		_Cj: _Cj,
+		Fj1: fj1,
+		Fj2: fj2,
+		Uj:  _Uj,
+		Cj:  _Cj,
 		C:   c,
 		Z1:  z1,
 		Z2:  z2,
@@ -160,12 +166,12 @@ func Verify(g0 *bn256.G1, h0 *bn256.G1, g1 *bn256.G2, pk *bn256.G2, proof *Proof
 	temp := Interpolation(d, v, indices, threshold)
 	temp = new(bn256.G1).ScalarMult(temp, proof.C)
 	temp = new(bn256.G1).Add(temp, new(bn256.G1).ScalarMult(h0, proof.Z3))
-	if bytes.Equal(proof._Cj.Marshal(), temp.Marshal()) {
+	if bytes.Equal(proof.Cj.Marshal(), temp.Marshal()) {
 		//fmt.Printf("The first verification Pass!\n")
 		temp1 := new(bn256.G1).ScalarMult(Uj, proof.C)
 		temp1 = new(bn256.G1).Add(temp1, new(bn256.G1).ScalarMult(g0, proof.Z3))
 		temp1 = new(bn256.G1).Add(temp1, new(bn256.G1).ScalarMult(h0, proof.Z1))
-		if bytes.Equal(proof._Uj.Marshal(), temp1.Marshal()) {
+		if bytes.Equal(proof.Uj.Marshal(), temp1.Marshal()) {
 			//fmt.Printf("The second verification Pass!\n")
 			right1 := bn256.Pair(new(bn256.G1).ScalarMult(proof.Ej, proof.C), pk)
 			right2 := bn256.Pair(new(bn256.G1).Neg(new(bn256.G1).ScalarMult(proof.Ej, proof.Z1)), g1)
