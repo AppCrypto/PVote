@@ -1,4 +1,4 @@
-# `Auditable healthcare data regulation based on fault-tolerant proxy re-encryption`
+
 
 
 # Pre-requisites

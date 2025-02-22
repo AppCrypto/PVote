@@ -27,11 +27,10 @@ contract Verification
     function A() pure internal returns (uint256) {
         return CURVE_A;
     }
-/*
+
     function P() pure internal returns (uint256) {
         return FIELD_ORDER;
     }
-*/
 
     function N() pure internal returns (uint256) {
         return CURVE_ORDER;
@@ -224,6 +223,9 @@ contract Verification
         G2Point G1;
         G2Point PKI;
         G1Point[] SigmaK;
+        uint256 a;
+        uint256 b;
+        uint256 numCandidates;
     }
 
     struct DLEQProof {
@@ -243,21 +245,29 @@ contract Verification
     Parameters PP;
     G1Point[] PKs;
     G1Point[][] EncShares;
+    G1Point[] DecShares;
     G1Point[][] U;
     G1Point[] AggregatedC;
     G1Point[] AggregatedU;
+    uint256[] HonestTalliers;
+    uint256[] TallyValue;
+    bool[] ZKRPVerifyResult;
+    bool[] DVerifyResult;
+    bool[] PVerifyResult;
     
 
-    function UploadParameters(G1Point memory g0, G1Point memory h0, G2Point memory g1, G2Point memory pkI, G1Point[] memory sigmak) public {
+    function UploadParameters(G1Point memory g0, G1Point memory h0, G2Point memory g1, G2Point memory pkI, G1Point[] memory sigmak,uint256 a, uint256 b,uint256 numCandidates) public {
         PP.G0 = g0;
         PP.H0 = h0;
         PP.G1 = g1;
         PP.PKI = pkI;
+        PP.a=a;
+        PP.b=b;
+        PP.numCandidates=numCandidates;
     	for (uint i = 0; i < sigmak.length; i++) {
             PP.SigmaK.push(sigmak[i]);
         }
     }
-
 
     function UploadPublicKey(G1Point[] memory pks) public{
         for (uint i=0;i<pks.length;i++){
@@ -265,7 +275,7 @@ contract Verification
         }
     }
 
-      function DLEQVerify(G1Point memory g, G1Point memory y1, G1Point memory a1, G1Point memory h, 
+    function DLEQVerify(G1Point memory g, G1Point memory y1, G1Point memory a1, G1Point memory h, 
                           G1Point memory y2, G1Point memory a2, uint256 c, uint256 z) public payable returns (bool)
     {
         G1Point memory gG = g1mul(g, z);
@@ -282,8 +292,6 @@ contract Verification
         }
         return true;
     }
-
-    bool[] DVerifyResult;
 
     function coefficient(uint256 i,uint256 n) public returns (uint256) {
         uint256 result=1;
@@ -335,8 +343,7 @@ contract Verification
         return DVerifyResult;
     }
 
-    uint256[] HonestVotors;
-    function UploadPVSSShares(uint256 indexVoter, G1Point[] memory v, G1Point[] memory c, G1Point[] memory a1,
+    function UploadPVSSShares(G1Point[] memory v, G1Point[] memory c, G1Point[] memory a1,
                               G1Point[] memory a2, uint256[] memory challenge, uint256[] memory z)public{
         for (uint i = 0; i < v.length; i++) {
             if (DVerify(PP.H0, v, a1, PKs, c, a2, challenge, z)==false){
@@ -346,15 +353,23 @@ contract Verification
         }
         DVerifyResult.push(true);
         EncShares.push(c);
-        HonestVotors.push(indexVoter);
         return;
     }
 
-    function UploadVotingCipher(G1Point[] memory Ej, G1Point[] memory Fj1, G1Point[] memory Fj2,G1Point[] memory _Uj,
+    function UploadBallotCipher(G1Point[] memory Ej, G1Point[] memory Fj1, G1Point[] memory Fj2,G1Point[] memory _Uj,
                         G1Point[] memory _Cj,uint256[] memory c,uint256[] memory z1,uint256[] memory z2,
-                        uint256[] memory z3, G1Point[] memory Uj, uint256[] memory d, G1Point[] memory v, 
-                        uint256[] memory indices, uint threshold)public{
-        if (ZKRPVerify(Ej, Fj1, Fj2, _Uj, _Cj, c, z1, z2, z3, Uj, d, v, indices,threshold) == true){
+                        uint256[] memory z3, G1Point[] memory Uj, G1Point[] memory v, uint threshold)public{
+        uint256[] memory selectIndices;
+        selectIndices=new uint256[](threshold);
+        for (uint i=0;i<threshold;i++){
+            selectIndices[i]=i+1;
+        }
+        uint256[] memory x;
+        x=new uint256[](PP.numCandidates);
+        for (uint d=0;d<PP.numCandidates;d++){
+            x[d]=submod(0,d);
+        }
+        if (ZKRPVerify(Ej, Fj1, Fj2, _Uj, _Cj, c, z1, z2, z3, Uj, x, v, selectIndices, threshold) == true){
             U.push(Uj);
         }
     }
@@ -362,7 +377,6 @@ contract Verification
     function Interpolation(uint256 d, G1Point[] memory v, uint256[] memory indices, uint256 threshold) public returns(G1Point memory){
         uint256[] memory coefficients;
         coefficients = new uint256[](threshold);
-
         for (uint i=0;i<threshold;i++){
             uint256 num=1;
             uint256 den=1;
@@ -384,8 +398,6 @@ contract Verification
         }
         return secret;
     }
-
-    bool[] ZKRPVerifyResult;
 
     function ZKRPVerify(G1Point[] memory Ej, G1Point[] memory Fj1, G1Point[] memory Fj2,G1Point[] memory _Uj,
                         G1Point[] memory _Cj,uint256[] memory c,uint256[] memory z1,uint256[] memory z2,
@@ -420,7 +432,7 @@ contract Verification
         return true;
     }
   
-    function GetDZKRPResult() public view returns (bool[] memory){
+    function GetZKRPResult() public view returns (bool[] memory){
         return ZKRPVerifyResult;
     }
 
@@ -444,16 +456,10 @@ contract Verification
 
     function GetAggregateValue() public view returns (G1Point[] memory){
         return AggregatedC;
-    }
-
-    G1Point[] DecShares;
-    bool[] PVerifyResult;
-    uint256[] HonestTalliers;
-    
-
+    }    
 
     function PVerify(uint indexTallier, G1Point memory DecShare, G1Point memory a1,G1Point memory a2,
-                     uint256 challenge, uint256 z)public returns(bool){
+                     uint256 challenge, uint256 z)public{
         if (DLEQVerify(PP.G0, PKs[indexTallier], a1, DecShare, AggregatedC[indexTallier], a2, challenge, z)==true){
             DecShares.push(DecShare);
             HonestTalliers.push(indexTallier);
@@ -467,8 +473,6 @@ contract Verification
     function GetPVerifyResult() public view returns (bool[] memory){
         return PVerifyResult;
     }
-
-    uint256[] TallyValue;
 
     function Tally(uint threshold,uint numCandidates, uint a, uint b)public{
         uint256[] memory selectIndices;
@@ -501,6 +505,5 @@ contract Verification
     function GetTallyValue() public view returns (uint256[] memory){
         return TallyValue;
     }
-
 
 }

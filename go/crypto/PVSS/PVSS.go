@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 
-	//"fmt"
 	"bytes"
 	"math/big"
 
@@ -39,12 +38,10 @@ func Setup(numTalliers int, g0 *bn256.G1) ([]*big.Int, []*bn256.G1) {
 }
 
 func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) Proof {
-	//生成承诺
 	r, _ := rand.Int(rand.Reader, bn256.Order)
 	rG := new(bn256.G1).ScalarMult(G, r)
 	rH := new(bn256.G1).ScalarMult(H, r)
 
-	// 计算挑战
 	new_hash := sha256.New()
 	new_hash.Write(xG.Marshal())
 	new_hash.Write(xH.Marshal())
@@ -55,7 +52,6 @@ func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) Proof {
 	c := new(big.Int).SetBytes(cb)
 	c.Mod(c, bn256.Order)
 
-	// 生成相应
 	z := new(big.Int).Mul(c, x)
 	z.Sub(r, z)
 	z.Mod(z, bn256.Order)
@@ -177,7 +173,7 @@ func PVerify(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sh *bn256.G1, proof Proof) 
 	return DLEQVerify(proof.C, proof.Z, h, sh, pk, c, proof.RG, proof.RH)
 }
 
-// evaluatePolynomial 在给定的 x 处计算多项式的值
+// Evaluate the polynomial at a given x
 func EvaluatePolynomial(coefficients []*big.Int, x, order *big.Int) *big.Int {
 	result := new(big.Int).Set(coefficients[0])
 	xPower := new(big.Int).Set(x)
@@ -194,33 +190,26 @@ func EvaluatePolynomial(coefficients []*big.Int, x, order *big.Int) *big.Int {
 	return result
 }
 
-// lagrangeInterpolation 求拉格朗日插值法的系数
+// Calculate the lagrange coefficient at l
 func LagrangeCoefficient(l *big.Int, indices []*big.Int, threshold int) []*big.Int {
-	// k是分享的数量
+
 	coefficient := make([]*big.Int, threshold)
 
-	// 对于每个分享
 	for i := 0; i < threshold; i++ {
-		// 初始化分子（num）和分母（den）为1
 		num := big.NewInt(1)
 		den := big.NewInt(1)
 
-		// 计算拉格朗日基函数的分子和分母
 		for j := 0; j < threshold; j++ {
 			if i != j {
-				// 分子累乘 -indices[j]
 				num.Mul(num, new(big.Int).Sub(l, indices[j]))
 				num.Mod(num, bn256.Order)
 
-				// 分母累乘 indices[i] - indices[j]
 				den.Mul(den, new(big.Int).Sub(indices[i], indices[j]))
 				den.Mod(den, bn256.Order)
 			}
 		}
 
-		// 计算分母的逆元（模order）
 		den.ModInverse(den, bn256.Order)
-		// 计算每一项的值 shares[i] * num * den
 		term := new(big.Int).Mul(num, den)
 		term.Mod(term, bn256.Order)
 		coefficient[i] = term

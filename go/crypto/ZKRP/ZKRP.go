@@ -55,7 +55,7 @@ func Setup(a int, b int) (*big.Int, PP) {
 	}
 }
 
-// evaluatePolynomial 在给定的 x 处计算多项式的值
+// Evaluate the polynomial at a given x
 func EvaluatePolynomial(coefficients []*big.Int, x, order *big.Int) *big.Int {
 	result := new(big.Int).Set(coefficients[0])
 	xPower := new(big.Int).Set(x)
@@ -124,33 +124,26 @@ func GenProof(g0 *bn256.G1, h0 *bn256.G1, g1 *bn256.G2, sj *big.Int, wj *big.Int
 	}
 }
 
-// lagrangeInterpolation
+// Calculate the lagrange coefficient at d
 func Interpolation(d *big.Int, v []*bn256.G1, indices []*big.Int, threshold int) *bn256.G1 {
-	// k是分享的数量
+
 	coefficient := make([]*big.Int, threshold)
 
-	// 对于每个分享
 	for i := 0; i < threshold; i++ {
-		// 初始化分子（num）和分母（den）为1
 		num := big.NewInt(1)
 		den := big.NewInt(1)
 
-		// 计算拉格朗日基函数的分子和分母
 		for j := 0; j < threshold; j++ {
 			if i != j {
-				// 分子累乘 -indices[j]
 				num.Mul(num, new(big.Int).Sub(d, indices[j]))
 				num.Mod(num, bn256.Order)
 
-				// 分母累乘 indices[i] - indices[j]
 				den.Mul(den, new(big.Int).Sub(indices[i], indices[j]))
 				den.Mod(den, bn256.Order)
 			}
 		}
 
-		// 计算分母的逆元（模order）
 		den.ModInverse(den, bn256.Order)
-		// 计算每一项的值 shares[i] * num * den
 		term := new(big.Int).Mul(num, den)
 		term.Mod(term, bn256.Order)
 		coefficient[i] = term
