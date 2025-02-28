@@ -40,11 +40,11 @@ func Setup(a int, b int) (*big.Int, PP) {
 	pk := new(bn256.G2).ScalarMult(g1, sk)
 
 	sigma_k := make([]*bn256.G1, b-a+1)
-	for i := a; i <= b; i++ {
-		den := new(big.Int).Add(big.NewInt(int64(i)), sk)
+	for i := 0; i <= b-a; i++ {
+		den := new(big.Int).Add(big.NewInt(int64(i+a)), sk)
 		den.ModInverse(den, bn256.Order)
 		temp := new(bn256.G1).ScalarMult(g0, den)
-		sigma_k[i-a] = temp
+		sigma_k[i] = temp
 	}
 	return sk, PP{
 		G0:      g0,

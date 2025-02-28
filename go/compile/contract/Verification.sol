@@ -118,7 +118,6 @@ contract Verification
 		return out[0] != 0;
 	}
 
-
 	/// Convenience method for a pairing check for two pairs.
 	function pairingProd2(G1Point memory a1, G2Point memory a2, G1Point memory b1, G2Point memory b2) view internal returns (bool) {
 		G1Point[] memory p1 = new G1Point[](2);
@@ -327,7 +326,7 @@ contract Verification
         if (RScodeVerify(y1)== false){
             return false;
         }else{
-            for(uint i=0;i<PKs.length;i++)
+            for(uint i=0;i<y1.length;i++)
             {
                 if (DLEQVerify(g, y1[i], a1[i], h[i],  y2[i], a2[i], c[i], z[i]) ==false)
                 {
@@ -345,11 +344,9 @@ contract Verification
 
     function UploadPVSSShares(G1Point[] memory v, G1Point[] memory c, G1Point[] memory a1,
                               G1Point[] memory a2, uint256[] memory challenge, uint256[] memory z)public{
-        for (uint i = 0; i < v.length; i++) {
-            if (DVerify(PP.H0, v, a1, PKs, c, a2, challenge, z)==false){
-                DVerifyResult.push(false);
-                return;
-            }
+        if (DVerify(PP.H0, v, a1, PKs, c, a2, challenge, z)==false){
+            DVerifyResult.push(false);
+            return;
         }
         DVerifyResult.push(true);
         EncShares.push(c);
@@ -436,6 +433,7 @@ contract Verification
         return ZKRPVerifyResult;
     }
 
+
     function Aggregate() public{
         for (uint256 i=0;i<EncShares[0].length;i++){
             G1Point memory aggregateC=g1mul(PP.G0,0);
@@ -490,20 +488,11 @@ contract Verification
             uint x=submod(0,d);
             S[d]=Interpolation(x, selectShares, selectIndices,threshold);
             AggregatedU[d]=g1add(AggregatedU[d],g1neg(S[d]));
-        }
-
-        for (uint d=0;d<numCandidates;d++){
-            for (uint k=(d+1)*a;k<b*numCandidates;k++){
-                if (AggregatedU[d].X==g1mul(PP.H0,k).X&&AggregatedU[d].Y==g1mul(PP.H0,k).Y){
-                    TallyValue.push(k);
-                    break;
-                }
-            }
-        }
+        }    
     }
 
-    function GetTallyValue() public view returns (uint256[] memory){
-        return TallyValue;
+    function GetTallyValue() public view returns (G1Point[] memory){
+        return AggregatedU;
     }
 
 }
