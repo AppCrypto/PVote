@@ -434,7 +434,7 @@ contract Verification
     }
 
 
-    function Aggregate() public{
+    function AggregateC() public{
         for (uint256 i=0;i<EncShares[0].length;i++){
             G1Point memory aggregateC=g1mul(PP.G0,0);
             for (uint256 j=0;j<EncShares.length;j++){
@@ -442,7 +442,9 @@ contract Verification
             }
             AggregatedC.push(aggregateC);
         }
+    }
 
+    function AggregateU() public{
         for(uint256 i=0;i<U[0].length;i++){
             G1Point memory aggregateU=g1mul(PP.G0,0);
             for(uint256 j=0;j<U.length;j++){

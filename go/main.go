@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"unsafe"
 
 	"PVote/compile/contract"
 	"PVote/utils"
@@ -25,6 +26,20 @@ import (
 type AggregatedValue struct {
 	C []*bn256.G1
 	U []*bn256.G1
+}
+
+// Compute G1Point size
+func sizeOfG1Point(p contract.VerificationG1Point) int {
+
+	structSize := int(unsafe.Sizeof(p))
+	dataSize := len(p.X.Bytes()) + len(p.Y.Bytes())
+
+	return structSize + dataSize
+}
+
+// Compute *big.Int size
+func sizeOfBigInt(n *big.Int) int {
+	return len(n.Bytes())
 }
 
 func main() {
@@ -54,14 +69,14 @@ func main() {
 	fmt.Printf("%v\n", Contract)
 
 	//Setup Phase
-	n := int64(1000)
+	n := int64(1)
 	//Init the public parameters
 	//The algorithms in Setup phase: PVSS.Setup and ZKRP.Setup
 
 	//Talliers:[4,6,8,10,12,14,16,18,20,22,24,26,28,30]
-	numTalliers := 30
+	numTalliers := 28
 	//Candidates
-	numCandidates := 10
+	numCandidates := 9
 	//Voters:[30,60,90,120,150,180,210,240,270,300]
 	numVoters := 1
 	threshold := (numTalliers + numCandidates) / 2
@@ -128,7 +143,7 @@ func main() {
 
 		}
 	}
-	fmt.Printf("All voting value is %v\n", w)
+	//fmt.Printf("All voting value is %v\n", w)
 
 	/*
 		Note:
@@ -175,6 +190,7 @@ func main() {
 	a1Set := make([][]contract.VerificationG1Point, numVoters)
 	a2Set := make([][]contract.VerificationG1Point, numVoters)
 	challengeSet := make([][]*big.Int, numVoters)
+	var PVSSComCost float64 = 0
 	zSet := make([][]*big.Int, numVoters)
 	for j := 0; j < numVoters; j++ {
 		vSet[j] = make([]contract.VerificationG1Point, numTalliers)
@@ -192,8 +208,22 @@ func main() {
 			a2Set[j][i] = Convert.G1ToG1Point(PVSSShares[j].Proofs[i].RH)
 			challengeSet[j][i] = PVSSShares[j].Proofs[i].C
 			zSet[j][i] = PVSSShares[j].Proofs[i].Z
+			//PVSSShare Communication Cost
+			PVSSComCost = PVSSComCost + float64(sizeOfG1Point(vSet[j][i])) + float64(sizeOfG1Point(cSet[j][i])) + float64(sizeOfG1Point(a1Set[j][i])) + float64(sizeOfG1Point(a2Set[j][i])) + float64(sizeOfBigInt(challengeSet[j][i])) + float64(sizeOfBigInt(zSet[j][i]))
+
 		}
 	}
+
+	//Test basic data structure
+	//G1Point Size
+	sizeG1Point := sizeOfG1Point(vSet[0][0])
+	fmt.Printf("Size of G1Point struct: %.6f KB\n", float64(sizeG1Point)/1024)
+	//big.Int Size
+	sizebigInt := sizeOfBigInt(challengeSet[0][0])
+	fmt.Printf("Size of big.Int: %.6f KB\n", float64(sizebigInt)/1024)
+
+	//Each voter's pvss communication cost
+	fmt.Printf("Size of PVSSShares of each voter: %.6f KB\n", PVSSComCost/1024)
 
 	//Each voter Vj uploads PVSSShares[j].V, PVSSShares[j].C, PVSSShares[j].Proofs
 	/*
@@ -222,7 +252,7 @@ func main() {
 
 	//Get the result of DVerify algorithm
 	DVerifyResult, _ := Contract.GetDVerifyResult(&bind.CallOpts{})
-	fmt.Printf("The Verification results of DVerify is %v\n", DVerifyResult)
+	fmt.Printf("The Verification results of DVerify is %v\n", DVerifyResult[0])
 
 	//Convert off-chain information into a format that can be stored on the chain
 	USet := make([][]contract.VerificationG1Point, numVoters)
@@ -236,6 +266,7 @@ func main() {
 	z2Set := make([][]*big.Int, numVoters)
 	z3Set := make([][]*big.Int, numVoters)
 	selectedV := make([][]contract.VerificationG1Point, numVoters)
+	var ZKRPComCost float64 = 0
 
 	for j := 0; j < numVoters; j++ {
 		USet[j] = make([]contract.VerificationG1Point, numCandidates)
@@ -261,12 +292,19 @@ func main() {
 			z1Set[j][i] = rangeProofs[j][i].Z1
 			z2Set[j][i] = rangeProofs[j][i].Z2
 			z3Set[j][i] = rangeProofs[j][i].Z3
+			ZKRPComCost = ZKRPComCost + float64(sizeOfG1Point(USet[j][i])) + float64(sizeOfG1Point(ESet[j][i])) + float64(sizeOfG1Point(F1Set[j][i])) + float64(sizeOfG1Point(F2Set[j][i])) + float64(sizeOfG1Point(_USet[j][i])) + float64(sizeOfG1Point(_CSet[j][i])) + float64(sizeOfBigInt(RPcSet[j][i])) + float64(sizeOfBigInt(z1Set[j][i])) + float64(sizeOfBigInt(z2Set[j][i])) + float64(sizeOfBigInt(z3Set[j][i]))
 		}
 
 		for i := 0; i < threshold; i++ {
 			selectedV[j][i] = Convert.G1ToG1Point(PVSSShares[j].V[i])
 		}
 	}
+
+	//Each voter's pvss communication cost
+	fmt.Printf("Size of ZKRPShares of each voter: %.6f KB\n", ZKRPComCost/1024)
+
+	//All communication cost of Algorithm1
+	fmt.Printf("Size of Algorithm1 of each voter: %.6f KB\n", (PVSSComCost+ZKRPComCost)/1024)
 
 	//Upload ballot ciphertexts U, the range proof of voting ciphertexts rangProofs onto smart contract.
 	/*
@@ -291,20 +329,29 @@ func main() {
 	fmt.Printf("UploadBallotCipherc Gas used: %d\n", sumGasZKRP)
 
 	ZKPRVerifyResult, _ := Contract.GetZKRPResult(&bind.CallOpts{})
-	fmt.Printf("The Verification results of ZKRPVerify is %v\n", ZKPRVerifyResult)
+	fmt.Printf("The Verification results of ZKRPVerify is %v\n", ZKPRVerifyResult[0])
 
 	fmt.Printf("Algorithm2 Gas used: %d\n", sumGasPVSS+sumGasZKRP)
 
 	//Aggregate encrypted shares PVSSShares[j].C
 	//Aggrate smart contract executes this operation
 	auth5 := utils.Transact(client, privatekey, big.NewInt(0))
-	tx5, _ := Contract.Aggregate(auth5)
+	tx5, _ := Contract.AggregateC(auth5)
 
 	receipt5, err := bind.WaitMined(context.Background(), client, tx5)
 	if err != nil {
 		log.Fatalf("Tx receipt failed: %v", err)
 	}
-	fmt.Printf("Aggregate Gas used: %d\n", receipt5.GasUsed)
+	fmt.Printf("AggregateC Gas used: %d\n", receipt5.GasUsed)
+
+	auth55 := utils.Transact(client, privatekey, big.NewInt(0))
+	tx55, _ := Contract.AggregateU(auth55)
+
+	receipt55, err := bind.WaitMined(context.Background(), client, tx55)
+	if err != nil {
+		log.Fatalf("Tx receipt failed: %v", err)
+	}
+	fmt.Printf("AggregateU Gas used: %d\n", receipt55.GasUsed)
 
 	//Off-chain algorithm2(each voter Vj): 1 PVSS.DVerify + l ZKRP.Verify
 	Algorithm2Result := make([]bool, numVoters)
@@ -338,7 +385,7 @@ func main() {
 	}
 	endtime = time.Now().UnixMicro()
 	fmt.Printf("Algorithm2 Time Used is %v us\n", (endtime-starttime)/n)
-	fmt.Printf("Algorithm2 Result is %v\n", Algorithm2Result)
+	fmt.Printf("Algorithm2 Result is %v\n", Algorithm2Result[0])
 
 	fmt.Printf("=================================Finish the Voting phase==========================================\n")
 	//Each Tallier decrypts the aggreated shares
@@ -356,7 +403,10 @@ func main() {
 	//Upload decrypted shares and corresponding DLEQ proofs
 	//PVerify smart contracts verifies the correctness of each decrypted shares
 	sumGasUsed := uint64(0)
+	var DecComCost float64 = 0
 	for i := 0; i < numTalliers; i++ {
+		//PVSS.Decrypt cpmmunication cost
+		DecComCost = DecComCost + float64(sizeOfG1Point(Convert.G1ToG1Point(sh[i]))) + float64(sizeOfG1Point(Convert.G1ToG1Point(shProof[i].RG))) + float64(sizeOfG1Point(Convert.G1ToG1Point(shProof[i].RH))) + float64(sizeOfBigInt(shProof[i].C)) + float64(sizeOfBigInt(shProof[i].Z))
 		auth6 := utils.Transact(client, privatekey, big.NewInt(0))
 		tx6, _ := Contract.PVerify(auth6, big.NewInt(int64(i)), Convert.G1ToG1Point(sh[i]), Convert.G1ToG1Point(shProof[i].RG), Convert.G1ToG1Point(shProof[i].RH), shProof[i].C, shProof[i].Z)
 
@@ -375,6 +425,7 @@ func main() {
 		}
 		sumGasUsed = sumGasUsed + receipt6.GasUsed
 	}
+	fmt.Printf("Size of PVSS.Decrypt of all talliers: %.6f KB\n", DecComCost/1024)
 	fmt.Printf("PVerify Gas used: %d\n", sumGasUsed)
 
 	//Count the final voting value via Tally algorithm
