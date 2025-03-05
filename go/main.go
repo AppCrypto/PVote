@@ -49,9 +49,9 @@ func main() {
 	//The algorithms in Setup phase: PVSS.Setup and ZKRP.Setup
 
 	//Talliers:[4,6,8,10,12,14,16,18,20,22,24,26,28,30]
-	numTalliers := 30
+	numTalliers := 10
 	//Candidates
-	numCandidates := 1
+	numCandidates := 2
 	//Voters:[30,60,90,120,150,180,210,240,270,300]
 	numVoters := 1
 	threshold := (numTalliers + numCandidates) / 2
@@ -368,7 +368,7 @@ func main() {
 	ZKPRVerifyResult, _ := Contract.GetZKRPResult(&bind.CallOpts{})
 	fmt.Printf("The Verification results of ZKRPVerify is %v\n", ZKPRVerifyResult[0])
 
-	fmt.Printf("Algorithm2 Gas used: %d\n", sumGasPVSS+sumGasZKRP)
+	fmt.Printf("Algorithm2 Gas used: %d\n", sumGasPVSS1+sumGasZKRP1)
 
 	//Aggregate encrypted shares PVSSShares[j].C
 	//Aggrate smart contract executes this operation
