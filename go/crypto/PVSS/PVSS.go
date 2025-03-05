@@ -83,9 +83,12 @@ func Share(secret *big.Int, h *bn256.G1, pks []*bn256.G1, threshold, numTalliers
 		shares[i] = EvaluatePolynomial(coefficients, x, bn256.Order)
 	}
 
-	v := make([]*bn256.G1, numTalliers)
+	v := make([]*bn256.G1, numTalliers+numCandidates)
 	for i := 0; i < numTalliers; i++ {
 		v[i] = new(bn256.G1).ScalarMult(h, shares[i])
+	}
+	for i := numTalliers; i < numTalliers+numCandidates; i++ {
+		v[i] = new(bn256.G1).ScalarMult(h, bindValue[i-numTalliers])
 	}
 
 	//Generate the encrypted shares under talliers' public key
@@ -117,47 +120,47 @@ func DLEQVerify(c, z *big.Int, G, H, xG, xH, rG, rH *bn256.G1) bool {
 	cxH := new(bn256.G1).ScalarMult(xH, c)
 	a := new(bn256.G1).Add(zG, cxG)
 	b := new(bn256.G1).Add(zH, cxH)
-	if !(rG.String() == a.String() && rH.String() == b.String()) {
-		return false
-	}
-	return true
+	return (rG.String() == a.String() && rH.String() == b.String())
+
 }
 
 // Reed Solomon check
-func coefficient(i int, n int) *big.Int {
+func Coefficient(i int, n int, l int) *big.Int {
 	result := big.NewInt(1)
-	for j := 1; j < n+1; j++ {
+	for j := -(l - 1); j <= n; j++ {
 		if i != j {
 			result = result.Mul(result, new(big.Int).ModInverse(new(big.Int).Sub(big.NewInt(int64(i)), big.NewInt(int64(j))), bn256.Order))
 			result = result.Mod(result, bn256.Order)
+
 		}
 	}
 	return result
 }
 
-func RScodeVerify(shares []*bn256.G1, H1 *bn256.G1) bool {
-	codeword := make([]*big.Int, len(shares))
-	for i := 1; i <= len(shares); i++ {
-		codeword[i-1] = new(big.Int).Mod(coefficient(i, len(shares)), bn256.Order)
+func RScodeVerify(shares []*bn256.G1, H1 *bn256.G1, n int, l int) bool {
+	codeword := make([]*big.Int, n+l)
+	for i := 1; i <= n; i++ {
+		codeword[i-1] = new(big.Int).Mod(Coefficient(i, n, l), bn256.Order)
 	}
+	for i := n; i < n+l; i++ {
+		codeword[i] = new(big.Int).Mod(Coefficient(-(i-n), n, l), bn256.Order)
+	}
+
 	sum := new(bn256.G1).ScalarMult(H1, big.NewInt(1))
-	for i := 0; i < len(shares); i++ {
+	for i := 0; i < n+l; i++ {
 		sum = new(bn256.G1).Add(sum, new(bn256.G1).ScalarMult(shares[i], codeword[i]))
 	}
-	if bytes.Equal(sum.Marshal(), H1.Marshal()) {
-		return true // if verify pass return true
-	}
-	return false // else return false
+	return bytes.Equal(sum.Marshal(), H1.Marshal())
 }
 
 // PVSS.DVerify
-func DVerify(secretsharing *SecretSharing, h *bn256.G1, pks []*bn256.G1) bool {
-	for i := 0; i < len(secretsharing.V); i++ {
+func DVerify(secretsharing *SecretSharing, h *bn256.G1, pks []*bn256.G1, numTalliers int, numCandidates int) bool {
+	for i := 0; i < len(pks); i++ {
 		if !DLEQVerify(secretsharing.Proofs[i].C, secretsharing.Proofs[i].Z, h, pks[i], secretsharing.V[i], secretsharing.C[i], secretsharing.Proofs[i].RG, secretsharing.Proofs[i].RH) {
 			return false
 		}
 	}
-	return RScodeVerify(secretsharing.V, h)
+	return RScodeVerify(secretsharing.V, h, numTalliers, numCandidates)
 }
 
 // PVSS.Decrypt

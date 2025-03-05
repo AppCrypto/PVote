@@ -225,6 +225,7 @@ contract Verification
         uint256 a;
         uint256 b;
         uint256 numCandidates;
+        uint256 numTalliers;
     }
 
     struct DLEQProof {
@@ -255,7 +256,7 @@ contract Verification
     bool[] PVerifyResult;
     
 
-    function UploadParameters(G1Point memory g0, G1Point memory h0, G2Point memory g1, G2Point memory pkI, G1Point[] memory sigmak,uint256 a, uint256 b,uint256 numCandidates) public {
+    function UploadParameters(G1Point memory g0, G1Point memory h0, G2Point memory g1, G2Point memory pkI, G1Point[] memory sigmak,uint256 a, uint256 b,uint256 numCandidates,uint256 numTalliers) public {
         PP.G0 = g0;
         PP.H0 = h0;
         PP.G1 = g1;
@@ -263,8 +264,15 @@ contract Verification
         PP.a=a;
         PP.b=b;
         PP.numCandidates=numCandidates;
+        PP.numTalliers=numTalliers;
     	for (uint i = 0; i < sigmak.length; i++) {
             PP.SigmaK.push(sigmak[i]);
+        }
+        for (uint i=0;i<numTalliers;i++){
+            AggregatedC.push(G1Point(0,0));
+        }
+        for(uint i=0;i<numCandidates;i++){
+            AggregatedU.push(G1Point(0,0));
         }
     }
 
@@ -292,25 +300,45 @@ contract Verification
         return true;
     }
 
-    function coefficient(uint256 i,uint256 n) public returns (uint256) {
+
+
+    function submodInt(int a, int b) internal view returns (uint256){
+        uint a_nn;
+        int sub=a-b;
+        if(sub<0){
+            return(GROUP_ORDER-uint(-sub));
+        }
+        return uint(sub);
+    }
+
+
+    function coefficient(int256 i,uint256 n,uint256 l) public returns (uint256) {
         uint256 result=1;
-        for (uint256 j=1;j<n+1;j++){
+        int l1=int(l);
+        int n1=int(n);
+        for (int256 j=-(l1-1);j<=n1;j++){
             if (i!=j){
-                result=mulmod(result,inv(submod(i,j),GROUP_ORDER),GROUP_ORDER);
+                result=mulmod(result,inv(submodInt(i,j),GROUP_ORDER),GROUP_ORDER);
                 result=addmod(result,0, GROUP_ORDER);
             }
         }
         return result;
     }
 
+
     function RScodeVerify(G1Point[] memory v) public returns (bool)
     {
+        uint256 n=uint256(PP.numTalliers);
+        uint256 l=uint256(PP.numCandidates);
         uint256[] memory codeword;
         codeword = new uint256[](v.length);
-        for (uint i=1;i<=v.length;i++){
-            codeword[i-1]= addmod(coefficient(i,v.length),0,GROUP_ORDER);
+        for (uint i=1;i<=n;i++){
+            codeword[i-1]= addmod(coefficient(int(i),n,l),0,GROUP_ORDER);
         }
-        G1Point memory sum=g1mul(PP.H0,1);
+        for (uint i=n;i<n+l;i++){
+            codeword[i]= addmod(coefficient(-(int(i-n)),n,l),0,GROUP_ORDER);
+        }
+        G1Point memory sum=PP.H0;
         for (uint i=0;i<v.length;i++){
             sum = g1add(sum,g1mul(v[i],codeword[i]));
         }
@@ -322,11 +350,12 @@ contract Verification
         return true;
     }
 
+
     function DVerify(G1Point memory g, G1Point[] memory y1, G1Point[] memory a1, G1Point[] memory h, G1Point[] memory y2, G1Point[] memory a2, uint256[] memory c, uint256[] memory z) public returns (bool){
         if (RScodeVerify(y1)== false){
             return false;
         }else{
-            for(uint i=0;i<y1.length;i++)
+            for(uint i=0;i<y2.length;i++)
             {
                 if (DLEQVerify(g, y1[i], a1[i], h[i],  y2[i], a2[i], c[i], z[i]) ==false)
                 {
@@ -342,6 +371,17 @@ contract Verification
         return DVerifyResult;
     }
 
+    function UploadPVSSShares1(G1Point[] memory v, G1Point[] memory c, G1Point[] memory a1,
+                              G1Point[] memory a2, uint256[] memory challenge, uint256[] memory z)public{
+        if (DVerify(PP.H0, v, a1, PKs, c, a2, challenge, z)==false){
+            DVerifyResult.push(false);
+            return;
+        }
+        DVerifyResult.push(true);
+        return;
+    }
+
+
     function UploadPVSSShares(G1Point[] memory v, G1Point[] memory c, G1Point[] memory a1,
                               G1Point[] memory a2, uint256[] memory challenge, uint256[] memory z)public{
         if (DVerify(PP.H0, v, a1, PKs, c, a2, challenge, z)==false){
@@ -349,8 +389,39 @@ contract Verification
             return;
         }
         DVerifyResult.push(true);
-        EncShares.push(c);
+
+        //AggregateC
+        for (uint256 j=0;j<c.length;j++){
+            AggregatedC[j]=g1add(AggregatedC[j],c[j]);
+        }
         return;
+    }
+
+    //35956-22668(empty function)=13288
+    function TestAggregateC(G1Point memory c)public{
+        AggregatedC[0]=g1add(AggregatedC[0],c);
+    }
+
+    function TestAggregateCSet(G1Point[] memory c)public{
+        //151947-34632(empty function)=117315
+        for (uint256 j=0;j<c.length;j++){
+            AggregatedC[j]=g1add(AggregatedC[j],c[j]);
+        }
+        //84987-34632=50355
+        for (uint256 j=0;j<c.length;j++){
+            AggregatedC[j]=c[j];
+        }
+    }
+
+    function TestAggregateUSet(G1Point[] memory U)public{
+        //71151-23388=47763
+        for (uint256 j=0;j<U.length;j++){
+            AggregatedU[j]=g1add(AggregatedU[j],U[j]);
+        }
+        //70052-23388=46664
+        for (uint256 j=0;j<U.length;j++){
+            AggregatedU[j]=U[j];
+        }
     }
 
     function UploadBallotCipher(G1Point[] memory Ej, G1Point[] memory Fj1, G1Point[] memory Fj2,G1Point[] memory _Uj,
@@ -366,9 +437,39 @@ contract Verification
         for (uint d=0;d<PP.numCandidates;d++){
             x[d]=submod(0,d);
         }
-        if (ZKRPVerify(Ej, Fj1, Fj2, _Uj, _Cj, c, z1, z2, z3, Uj, x, v, selectIndices, threshold) == true){
-            U.push(Uj);
+        if (ZKRPVerify(Ej, Fj1, Fj2, _Uj, _Cj, c, z1, z2, z3, Uj, x, v, selectIndices, threshold) == false){
+            ZKRPVerifyResult.push(false);
+            return;
         }
+        ZKRPVerifyResult.push(true);
+
+        //AggregateU
+        for (uint256 j=0;j<Uj.length;j++){
+            AggregatedU[j]=g1add(AggregatedU[j],Uj[j]);
+        }
+        return;
+
+    }
+
+    function UploadBallotCipher1(G1Point[] memory Ej, G1Point[] memory Fj1, G1Point[] memory Fj2,G1Point[] memory _Uj,
+                        G1Point[] memory _Cj,uint256[] memory c,uint256[] memory z1,uint256[] memory z2,
+                        uint256[] memory z3, G1Point[] memory Uj, G1Point[] memory v, uint threshold)public{
+        uint256[] memory selectIndices;
+        selectIndices=new uint256[](threshold);
+        for (uint i=0;i<threshold;i++){
+            selectIndices[i]=i+1;
+        }
+        uint256[] memory x;
+        x=new uint256[](PP.numCandidates);
+        for (uint d=0;d<PP.numCandidates;d++){
+            x[d]=submod(0,d);
+        }
+        if (ZKRPVerify(Ej, Fj1, Fj2, _Uj, _Cj, c, z1, z2, z3, Uj, x, v, selectIndices, threshold) == false){
+            ZKRPVerifyResult.push(false);
+            return;
+        }
+        ZKRPVerifyResult.push(true);
+        return;
     }
 
     function Interpolation(uint256 d, G1Point[] memory v, uint256[] memory indices, uint256 threshold) public returns(G1Point memory){
@@ -401,7 +502,8 @@ contract Verification
                         uint256[] memory z3, G1Point[] memory Uj, uint256[] memory d, G1Point[] memory v, 
                         uint256[] memory indices, uint threshold)public returns (bool){
         for(uint i=0;i<d.length;i++){
-            G1Point memory temp=Interpolation(d[i],v,indices,threshold);
+            //G1Point memory temp=Interpolation(d[i],v,indices,threshold);
+            G1Point memory temp=v[i];
             temp= g1mul(temp, c[i]);
             temp=g1add(temp,g1mul(PP.H0,z3[i]));
             if ((_Cj[i].X != temp.X) || (_Cj[i].Y != temp.Y)){
@@ -434,9 +536,9 @@ contract Verification
     }
 
 
-    function AggregateC() public{
+    function AggregateEncShares() public{
         for (uint256 i=0;i<EncShares[0].length;i++){
-            G1Point memory aggregateC=g1mul(PP.G0,0);
+            G1Point memory aggregateC=G1Point(0, 0);
             for (uint256 j=0;j<EncShares.length;j++){
                 aggregateC=g1add(aggregateC,EncShares[j][i]);
             }
@@ -444,9 +546,9 @@ contract Verification
         }
     }
 
-    function AggregateU() public{
+    function AggregateCiphertext() public{
         for(uint256 i=0;i<U[0].length;i++){
-            G1Point memory aggregateU=g1mul(PP.G0,0);
+            G1Point memory aggregateU=G1Point(0, 0);
             for(uint256 j=0;j<U.length;j++){
                 aggregateU=g1add(aggregateU,U[j][i]);
             }

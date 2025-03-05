@@ -43,6 +43,20 @@ func sizeOfBigInt(n *big.Int) int {
 }
 
 func main() {
+	//Setup Phase
+	n := int64(1)
+	//Init the public parameters
+	//The algorithms in Setup phase: PVSS.Setup and ZKRP.Setup
+
+	//Talliers:[4,6,8,10,12,14,16,18,20,22,24,26,28,30]
+	numTalliers := 10
+	//Candidates
+	numCandidates := 1
+	//Voters:[30,60,90,120,150,180,210,240,270,300]
+	numVoters := 1
+	threshold := (numTalliers + numCandidates) / 2
+	fmt.Printf("numTalliers=%v\nnumCandidates=%v\nnumVoters=%v\nThreshold=%v\n", numTalliers, numCandidates, numVoters, threshold)
+
 	//Deploy the smart contract
 	contract_name := "Verification"
 	client, err := ethclient.Dial("http://127.0.0.1:8545")
@@ -68,20 +82,6 @@ func main() {
 	}
 	fmt.Printf("%v\n", Contract)
 
-	//Setup Phase
-	n := int64(1)
-	//Init the public parameters
-	//The algorithms in Setup phase: PVSS.Setup and ZKRP.Setup
-
-	//Talliers:[4,6,8,10,12,14,16,18,20,22,24,26,28,30]
-	numTalliers := 28
-	//Candidates
-	numCandidates := 9
-	//Voters:[30,60,90,120,150,180,210,240,270,300]
-	numVoters := 1
-	threshold := (numTalliers + numCandidates) / 2
-	fmt.Printf("numTalliers=%v\nnumCandidates=%v\nnumVoters=%v\nThreshold=%v\n", numTalliers, numCandidates, numVoters, threshold)
-
 	//ballot range
 	a := big.NewInt(0)
 	b := big.NewInt(10)
@@ -103,7 +103,7 @@ func main() {
 	}
 
 	auth0 := utils.Transact(client, privatekey, big.NewInt(0))
-	tx0, _ := Contract.UploadParameters(auth0, Convert.G1ToG1Point(PP.G0), Convert.G1ToG1Point(PP.H0), Convert.G2ToG2Point(PP.G1), Convert.G2ToG2Point(PP.PKI), sigmak, a, b, big.NewInt(int64(numCandidates)))
+	tx0, _ := Contract.UploadParameters(auth0, Convert.G1ToG1Point(PP.G0), Convert.G1ToG1Point(PP.H0), Convert.G2ToG2Point(PP.G1), Convert.G2ToG2Point(PP.PKI), sigmak, a, b, big.NewInt(int64(numCandidates)), big.NewInt(int64(numTalliers)))
 	receipt0, err := bind.WaitMined(context.Background(), client, tx0)
 	if err != nil {
 		log.Fatalf("Tx receipt failed: %v", err)
@@ -143,7 +143,7 @@ func main() {
 
 		}
 	}
-	//fmt.Printf("All voting value is %v\n", w)
+	fmt.Printf("All voting value is %v\n", w)
 
 	/*
 		Note:
@@ -193,7 +193,7 @@ func main() {
 	var PVSSComCost float64 = 0
 	zSet := make([][]*big.Int, numVoters)
 	for j := 0; j < numVoters; j++ {
-		vSet[j] = make([]contract.VerificationG1Point, numTalliers)
+		vSet[j] = make([]contract.VerificationG1Point, numTalliers+numCandidates)
 		cSet[j] = make([]contract.VerificationG1Point, numTalliers)
 		a1Set[j] = make([]contract.VerificationG1Point, numTalliers)
 		a2Set[j] = make([]contract.VerificationG1Point, numTalliers)
@@ -211,6 +211,9 @@ func main() {
 			//PVSSShare Communication Cost
 			PVSSComCost = PVSSComCost + float64(sizeOfG1Point(vSet[j][i])) + float64(sizeOfG1Point(cSet[j][i])) + float64(sizeOfG1Point(a1Set[j][i])) + float64(sizeOfG1Point(a2Set[j][i])) + float64(sizeOfBigInt(challengeSet[j][i])) + float64(sizeOfBigInt(zSet[j][i]))
 
+		}
+		for i := numTalliers; i < numTalliers+numCandidates; i++ {
+			vSet[j][i] = Convert.G1ToG1Point(PVSSShares[j].V[i])
 		}
 	}
 
@@ -248,11 +251,25 @@ func main() {
 		}
 		sumGasPVSS = sumGasPVSS + receipt2.GasUsed
 	}
-	fmt.Printf("UploadPVSSShares Gas used: %d\n", sumGasPVSS)
+	fmt.Printf("UploadPVSSShares Gas used(aggregate): %d\n", sumGasPVSS)
+
+	//Algorithm2(each voter Vj): 1 PVSS.DVerify + l ZKRP.Verify+AggregatedC+AggregatedU
+	sumGasPVSS1 := uint64(0)
+	for j := 0; j < numVoters; j++ {
+		auth2 := utils.Transact(client, privatekey, big.NewInt(0))
+		tx2, _ := Contract.UploadPVSSShares1(auth2, vSet[j], cSet[j], a1Set[j], a2Set[j], challengeSet[j], zSet[j])
+
+		receipt2, err := bind.WaitMined(context.Background(), client, tx2)
+		if err != nil {
+			log.Fatalf("Tx receipt failed: %v", err)
+		}
+		sumGasPVSS1 = sumGasPVSS1 + receipt2.GasUsed
+	}
+	fmt.Printf("UploadPVSSShares Gas used(no aggregate): %d\n", sumGasPVSS1)
 
 	//Get the result of DVerify algorithm
 	DVerifyResult, _ := Contract.GetDVerifyResult(&bind.CallOpts{})
-	fmt.Printf("The Verification results of DVerify is %v\n", DVerifyResult[0])
+	fmt.Printf("The Verification results of DVerify is %v\n", DVerifyResult)
 
 	//Convert off-chain information into a format that can be stored on the chain
 	USet := make([][]contract.VerificationG1Point, numVoters)
@@ -279,7 +296,7 @@ func main() {
 		z1Set[j] = make([]*big.Int, numCandidates)
 		z2Set[j] = make([]*big.Int, numCandidates)
 		z3Set[j] = make([]*big.Int, numCandidates)
-		selectedV[j] = make([]contract.VerificationG1Point, threshold)
+		selectedV[j] = make([]contract.VerificationG1Point, numCandidates)
 
 		for i := 0; i < numCandidates; i++ {
 			USet[j][i] = Convert.G1ToG1Point(U[j][i])
@@ -292,13 +309,18 @@ func main() {
 			z1Set[j][i] = rangeProofs[j][i].Z1
 			z2Set[j][i] = rangeProofs[j][i].Z2
 			z3Set[j][i] = rangeProofs[j][i].Z3
+			selectedV[j][i] = Convert.G1ToG1Point(PVSSShares[j].V[i+numTalliers])
 			ZKRPComCost = ZKRPComCost + float64(sizeOfG1Point(USet[j][i])) + float64(sizeOfG1Point(ESet[j][i])) + float64(sizeOfG1Point(F1Set[j][i])) + float64(sizeOfG1Point(F2Set[j][i])) + float64(sizeOfG1Point(_USet[j][i])) + float64(sizeOfG1Point(_CSet[j][i])) + float64(sizeOfBigInt(RPcSet[j][i])) + float64(sizeOfBigInt(z1Set[j][i])) + float64(sizeOfBigInt(z2Set[j][i])) + float64(sizeOfBigInt(z3Set[j][i]))
 		}
-
-		for i := 0; i < threshold; i++ {
-			selectedV[j][i] = Convert.G1ToG1Point(PVSSShares[j].V[i])
-		}
 	}
+
+	auth111 := utils.Transact(client, privatekey, big.NewInt(0))
+	tx111, _ := Contract.TestAggregateUSet(auth111, USet[0])
+	receipt111, err := bind.WaitMined(context.Background(), client, tx111)
+	if err != nil {
+		log.Fatalf("Tx receipt failed: %v", err)
+	}
+	fmt.Printf("One AggregateU Gas used: %d\n", receipt111.GasUsed)
 
 	//Each voter's pvss communication cost
 	fmt.Printf("Size of ZKRPShares of each voter: %.6f KB\n", ZKRPComCost/1024)
@@ -326,7 +348,20 @@ func main() {
 		}
 		sumGasZKRP = sumGasZKRP + receipt3.GasUsed
 	}
-	fmt.Printf("UploadBallotCipherc Gas used: %d\n", sumGasZKRP)
+	fmt.Printf("UploadBallotCipher(Aggregate) Gas used: %d\n", sumGasZKRP)
+
+	sumGasZKRP1 := uint64(0)
+	for j := 0; j < numVoters; j++ {
+		auth3 := utils.Transact(client, privatekey, big.NewInt(0))
+		tx3, _ := Contract.UploadBallotCipher1(auth3, ESet[j], F1Set[j], F2Set[j], _USet[j], _CSet[j], RPcSet[j], z1Set[j], z2Set[j], z3Set[j], USet[j], selectedV[j], big.NewInt(int64(threshold)))
+
+		receipt3, err := bind.WaitMined(context.Background(), client, tx3)
+		if err != nil {
+			log.Fatalf("Tx receipt failed: %v", err)
+		}
+		sumGasZKRP1 = sumGasZKRP1 + receipt3.GasUsed
+	}
+	fmt.Printf("UploadBallotCipher(no Aggregate) Gas used: %d\n", sumGasZKRP1)
 
 	ZKPRVerifyResult, _ := Contract.GetZKRPResult(&bind.CallOpts{})
 	fmt.Printf("The Verification results of ZKRPVerify is %v\n", ZKPRVerifyResult[0])
@@ -335,23 +370,23 @@ func main() {
 
 	//Aggregate encrypted shares PVSSShares[j].C
 	//Aggrate smart contract executes this operation
-	auth5 := utils.Transact(client, privatekey, big.NewInt(0))
-	tx5, _ := Contract.AggregateC(auth5)
+	// auth5 := utils.Transact(client, privatekey, big.NewInt(0))
+	// tx5, _ := Contract.AggregateC(auth5)
 
-	receipt5, err := bind.WaitMined(context.Background(), client, tx5)
-	if err != nil {
-		log.Fatalf("Tx receipt failed: %v", err)
-	}
-	fmt.Printf("AggregateC Gas used: %d\n", receipt5.GasUsed)
+	// receipt5, err := bind.WaitMined(context.Background(), client, tx5)
+	// if err != nil {
+	// 	log.Fatalf("Tx receipt failed: %v", err)
+	// }
+	// fmt.Printf("AggregateC Gas used: %d\n", receipt5.GasUsed)
 
-	auth55 := utils.Transact(client, privatekey, big.NewInt(0))
-	tx55, _ := Contract.AggregateU(auth55)
+	// auth55 := utils.Transact(client, privatekey, big.NewInt(0))
+	// tx55, _ := Contract.AggregateCiphertext(auth55)
 
-	receipt55, err := bind.WaitMined(context.Background(), client, tx55)
-	if err != nil {
-		log.Fatalf("Tx receipt failed: %v", err)
-	}
-	fmt.Printf("AggregateU Gas used: %d\n", receipt55.GasUsed)
+	// receipt55, err := bind.WaitMined(context.Background(), client, tx55)
+	// if err != nil {
+	// 	log.Fatalf("Tx receipt failed: %v", err)
+	// }
+	// fmt.Printf("AggregateU Gas used: %d\n", receipt55.GasUsed)
 
 	//Off-chain algorithm2(each voter Vj): 1 PVSS.DVerify + l ZKRP.Verify
 	Algorithm2Result := make([]bool, numVoters)
@@ -371,7 +406,7 @@ func main() {
 	for k := 0; k < int(n); k++ {
 		for j := 0; j < numVoters; j++ {
 			selectedShares := PVSSShares[j].V[:threshold]
-			if !PVSS.DVerify(PVSSShares[j], PP.H0, PKs) {
+			if !PVSS.DVerify(PVSSShares[j], PP.H0, PKs, numTalliers, numCandidates) {
 				Algorithm2Result[j] = false
 			} else {
 				for d := 0; d < numCandidates; d++ {
@@ -391,6 +426,7 @@ func main() {
 	//Each Tallier decrypts the aggreated shares
 	//Get the aggregated result from the blockchain
 	AggregateResultC, _ := Contract.GetAggregateValue(&bind.CallOpts{})
+	//fmt.Printf("The aggregated C is %v\n", AggregateResultC)
 	//Each tallier decrypts corresponding aggregated encrypted shares and generates a DLEQ proof.
 	sh := make([]*bn256.G1, numTalliers)
 	shProof := make([]PVSS.Proof, numTalliers)

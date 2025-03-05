@@ -37,7 +37,8 @@ func Deploy(client *ethclient.Client, contract_name string, auth *bind.TransactO
 		log.Fatalf("Failed to parse ABI: %v", err)
 	}
 
-	address, tx, _, err := bind.DeployContract(auth, parsedABI, common.FromHex(string(bin)), client)
+	// **修改**：使用 client 代替 []byte 作为 ContractBackend 参数
+	address, tx, _, err := bind.DeployContract(auth, parsedABI, common.FromHex(string(bin)), client) // 传入 client
 	if err != nil {
 		log.Fatalf("Failed to deploy contract: %v", err)
 	}
