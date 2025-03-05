@@ -248,6 +248,7 @@ contract Verification
     G1Point[] DecShares;
     G1Point[][] U;
     G1Point[] AggregatedC;
+    G1Point[] AggregatedC1;
     G1Point[] AggregatedU;
     uint256[] HonestTalliers;
     uint256[] TallyValue;
@@ -270,6 +271,7 @@ contract Verification
         }
         for (uint i=0;i<numTalliers;i++){
             AggregatedC.push(G1Point(0,0));
+            AggregatedC1.push(G1Point(0,0));
         }
         for(uint i=0;i<numCandidates;i++){
             AggregatedU.push(G1Point(0,0));
@@ -371,13 +373,15 @@ contract Verification
         return DVerifyResult;
     }
 
+    bool[] DVerifyResult1;
+
     function UploadPVSSShares1(G1Point[] memory v, G1Point[] memory c, G1Point[] memory a1,
                               G1Point[] memory a2, uint256[] memory challenge, uint256[] memory z)public{
         if (DVerify(PP.H0, v, a1, PKs, c, a2, challenge, z)==false){
-            DVerifyResult.push(false);
+            DVerifyResult1.push(false);
             return;
         }
-        DVerifyResult.push(true);
+        DVerifyResult1.push(true);
         return;
     }
 
@@ -397,32 +401,22 @@ contract Verification
         return;
     }
 
-    //35956-22668(empty function)=13288
-    function TestAggregateC(G1Point memory c)public{
-        AggregatedC[0]=g1add(AggregatedC[0],c);
-    }
-
     function TestAggregateCSet(G1Point[] memory c)public{
-        //151947-34632(empty function)=117315
-        for (uint256 j=0;j<c.length;j++){
-            AggregatedC[j]=g1add(AggregatedC[j],c[j]);
-        }
-        //84987-34632=50355
+        //35083
+        //for (uint256 j=0;j<c.length;j++){}
+    
+        /*
+        //84999-34632=50347
         for (uint256 j=0;j<c.length;j++){
             AggregatedC[j]=c[j];
         }
+        */ 
+        //151935-34632(empty function)=117303
+        for (uint256 j=0;j<c.length;j++){
+            AggregatedC[j]=g1add(AggregatedC[j],c[j]);
+        }
     }
 
-    function TestAggregateUSet(G1Point[] memory U)public{
-        //71151-23388=47763
-        for (uint256 j=0;j<U.length;j++){
-            AggregatedU[j]=g1add(AggregatedU[j],U[j]);
-        }
-        //70052-23388=46664
-        for (uint256 j=0;j<U.length;j++){
-            AggregatedU[j]=U[j];
-        }
-    }
 
     function UploadBallotCipher(G1Point[] memory Ej, G1Point[] memory Fj1, G1Point[] memory Fj2,G1Point[] memory _Uj,
                         G1Point[] memory _Cj,uint256[] memory c,uint256[] memory z1,uint256[] memory z2,
@@ -536,64 +530,46 @@ contract Verification
     }
 
 
-    function AggregateEncShares() public{
-        for (uint256 i=0;i<EncShares[0].length;i++){
-            G1Point memory aggregateC=G1Point(0, 0);
-            for (uint256 j=0;j<EncShares.length;j++){
-                aggregateC=g1add(aggregateC,EncShares[j][i]);
-            }
-            AggregatedC.push(aggregateC);
-        }
-    }
-
-    function AggregateCiphertext() public{
-        for(uint256 i=0;i<U[0].length;i++){
-            G1Point memory aggregateU=G1Point(0, 0);
-            for(uint256 j=0;j<U.length;j++){
-                aggregateU=g1add(aggregateU,U[j][i]);
-            }
-            AggregatedU.push(aggregateU);
-        }
-    }
-
     function GetAggregateValue() public view returns (G1Point[] memory){
         return AggregatedC;
     }    
 
-    function PVerify(uint indexTallier, G1Point memory DecShare, G1Point memory a1,G1Point memory a2,
-                     uint256 challenge, uint256 z)public{
-        if (DLEQVerify(PP.G0, PKs[indexTallier], a1, DecShare, AggregatedC[indexTallier], a2, challenge, z)==true){
-            DecShares.push(DecShare);
-            HonestTalliers.push(indexTallier);
-            PVerifyResult.push(true);
-        }else{
-            PVerifyResult.push(false);
+    function PVerify(uint[] memory indexTallier, G1Point[] memory DecShare, G1Point[] memory a1,G1Point[] memory a2,
+                     uint256[] memory challenge, uint256[] memory z, uint threshold)public{
+        for (uint i=0;i<threshold;i++){
+            DLEQVerify(PP.G0, PKs[indexTallier[i]-1], a1[i], DecShare[i], AggregatedC[indexTallier[i]-1], a2[i], challenge[i], z[i]);
         }
-
     }
 
-    function GetPVerifyResult() public view returns (bool[] memory){
-        return PVerifyResult;
-    }
 
-    function Tally(uint threshold,uint numCandidates, uint a, uint b)public{
+    function PVerifyTally(uint[] memory indexTallier, G1Point[] memory DecShare, G1Point[] memory a1, G1Point[] memory a2, 
+                        uint256[] memory challenge, uint256[] memory z,uint threshold,uint numCandidates)public{
         uint256[] memory selectIndices;
         G1Point[] memory selectShares;
         selectIndices=new uint256[](threshold);
         selectShares=new G1Point[](threshold);
+
         //Generate the index set of honest talliers
         for (uint i=0;i<threshold;i++){
-            selectIndices[i]=HonestTalliers[i]+1;
-            selectShares[i]=DecShares[i];
-        }
+            if (DLEQVerify(PP.G0, PKs[indexTallier[i]-1], a1[i], DecShare[i], AggregatedC[indexTallier[i]-1], a2[i], challenge[i], z[i])==true){
+                selectShares[i]=DecShare[i];
+                selectIndices[i]=indexTallier[i];
+            }
+        } 
+
         G1Point[] memory S;
         S=new G1Point[](numCandidates);
         for (uint d=0;d<numCandidates;d++){
             uint x=submod(0,d);
             S[d]=Interpolation(x, selectShares, selectIndices,threshold);
             AggregatedU[d]=g1add(AggregatedU[d],g1neg(S[d]));
-        }    
+        }                
     }
+
+    function GetPVerifyResult() public view returns (bool[] memory){
+        return PVerifyResult;
+    }
+
 
     function GetTallyValue() public view returns (G1Point[] memory){
         return AggregatedU;

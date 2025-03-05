@@ -49,7 +49,7 @@ func main() {
 	//The algorithms in Setup phase: PVSS.Setup and ZKRP.Setup
 
 	//Talliers:[4,6,8,10,12,14,16,18,20,22,24,26,28,30]
-	numTalliers := 10
+	numTalliers := 30
 	//Candidates
 	numCandidates := 1
 	//Voters:[30,60,90,120,150,180,210,240,270,300]
@@ -266,6 +266,15 @@ func main() {
 		sumGasPVSS1 = sumGasPVSS1 + receipt2.GasUsed
 	}
 	fmt.Printf("UploadPVSSShares Gas used(no aggregate): %d\n", sumGasPVSS1)
+	fmt.Printf("AggregateC Gas used: %v\n", sumGasPVSS-sumGasPVSS1)
+
+	// auth222 := utils.Transact(client, privatekey, big.NewInt(0))
+	// tx222, _ := Contract.TestAggregateCSet(auth222, cSet[0])
+	// receipt222, err := bind.WaitMined(context.Background(), client, tx222)
+	// if err != nil {
+	// 	log.Fatalf("Tx receipt failed: %v", err)
+	// }
+	// fmt.Printf("One AggregateC Gas used: %d\n", receipt222.GasUsed)
 
 	//Get the result of DVerify algorithm
 	DVerifyResult, _ := Contract.GetDVerifyResult(&bind.CallOpts{})
@@ -314,14 +323,6 @@ func main() {
 		}
 	}
 
-	auth111 := utils.Transact(client, privatekey, big.NewInt(0))
-	tx111, _ := Contract.TestAggregateUSet(auth111, USet[0])
-	receipt111, err := bind.WaitMined(context.Background(), client, tx111)
-	if err != nil {
-		log.Fatalf("Tx receipt failed: %v", err)
-	}
-	fmt.Printf("One AggregateU Gas used: %d\n", receipt111.GasUsed)
-
 	//Each voter's pvss communication cost
 	fmt.Printf("Size of ZKRPShares of each voter: %.6f KB\n", ZKRPComCost/1024)
 
@@ -362,6 +363,7 @@ func main() {
 		sumGasZKRP1 = sumGasZKRP1 + receipt3.GasUsed
 	}
 	fmt.Printf("UploadBallotCipher(no Aggregate) Gas used: %d\n", sumGasZKRP1)
+	fmt.Printf("AggregateU Gas used: %v\n", sumGasZKRP-sumGasZKRP1)
 
 	ZKPRVerifyResult, _ := Contract.GetZKRPResult(&bind.CallOpts{})
 	fmt.Printf("The Verification results of ZKRPVerify is %v\n", ZKPRVerifyResult[0])
@@ -435,45 +437,58 @@ func main() {
 		sh[i], shProof[i] = PVSS.Decrypt(PP.G0, PKs[i], Convert.G1PointToG1(AggregateResultC[i]), SKs[i])
 	}
 
+	starttime = time.Now().UnixMicro()
+	for k := 0; k < 1000; k++ {
+		sh[0], shProof[0] = PVSS.Decrypt(PP.G0, PKs[0], Convert.G1PointToG1(AggregateResultC[0]), SKs[0])
+	}
+	endtime = time.Now().UnixMicro()
+	fmt.Printf("Decrypt Time Used is %v us\n", (endtime-starttime)/1000)
+
 	//TODO:
 	//Upload decrypted shares and corresponding DLEQ proofs
 	//PVerify smart contracts verifies the correctness of each decrypted shares
-	sumGasUsed := uint64(0)
 	var DecComCost float64 = 0
-	for i := 0; i < numTalliers; i++ {
-		//PVSS.Decrypt cpmmunication cost
+	for i := 0; i < threshold; i++ {
+		//PVSS.Decrypt communication cost
 		DecComCost = DecComCost + float64(sizeOfG1Point(Convert.G1ToG1Point(sh[i]))) + float64(sizeOfG1Point(Convert.G1ToG1Point(shProof[i].RG))) + float64(sizeOfG1Point(Convert.G1ToG1Point(shProof[i].RH))) + float64(sizeOfBigInt(shProof[i].C)) + float64(sizeOfBigInt(shProof[i].Z))
-		auth6 := utils.Transact(client, privatekey, big.NewInt(0))
-		tx6, _ := Contract.PVerify(auth6, big.NewInt(int64(i)), Convert.G1ToG1Point(sh[i]), Convert.G1ToG1Point(shProof[i].RG), Convert.G1ToG1Point(shProof[i].RH), shProof[i].C, shProof[i].Z)
 
-		receipt6, err := bind.WaitMined(context.Background(), client, tx6)
-		if err != nil {
-			log.Fatalf("Tx receipt failed: %v", err)
-		}
-		PVerifyResult, _ := Contract.GetPVerifyResult(&bind.CallOpts{})
-		// if PVerifyResult[i] {
-		// 	fmt.Printf("The %vth tallier is honest!\n", i)
-		// } else {
-		// 	fmt.Printf("The %vth tallier is not honest!\n", i)
-		// }
-		if i == numTalliers-1 {
-			fmt.Printf("The Verification results of PVerifyResult is %v\n", PVerifyResult)
-		}
-		sumGasUsed = sumGasUsed + receipt6.GasUsed
 	}
 	fmt.Printf("Size of PVSS.Decrypt of all talliers: %.6f KB\n", DecComCost/1024)
-	fmt.Printf("PVerify Gas used: %d\n", sumGasUsed)
 
-	//Count the final voting value via Tally algorithm
-	//TODO:
-	auth7 := utils.Transact(client, privatekey, big.NewInt(0))
-	tx7, _ := Contract.Tally(auth7, big.NewInt(int64(threshold)), big.NewInt(int64(numCandidates)), a, b)
+	//Convert off-chain information into a format that can be stored on the chain
+	PTindexTallierSet := make([]*big.Int, numTalliers)
+	PTDecShareSet := make([]contract.VerificationG1Point, numTalliers)
+	PTa1Set := make([]contract.VerificationG1Point, numTalliers)
+	PTa2Set := make([]contract.VerificationG1Point, numTalliers)
+	PTchallengeSet := make([]*big.Int, numTalliers)
+	PTzSet := make([]*big.Int, numTalliers)
+	for j := 0; j < numTalliers; j++ {
+		PTindexTallierSet[j] = new(big.Int).Add(big.NewInt(int64(j)), big.NewInt(int64(1)))
+		PTDecShareSet[j] = Convert.G1ToG1Point(sh[j])
+		PTa1Set[j] = Convert.G1ToG1Point(shProof[j].RG)
+		PTa2Set[j] = Convert.G1ToG1Point(shProof[j].RH)
+		PTchallengeSet[j] = shProof[j].C
+		PTzSet[j] = shProof[j].Z
+	}
 
-	receipt7, err := bind.WaitMined(context.Background(), client, tx7)
+	auth8 := utils.Transact(client, privatekey, big.NewInt(0))
+	tx8, _ := Contract.PVerifyTally(auth8, PTindexTallierSet, PTDecShareSet, PTa1Set, PTa2Set, PTchallengeSet, PTzSet, big.NewInt(int64(threshold)), big.NewInt(int64(numCandidates)))
+
+	receipt8, err := bind.WaitMined(context.Background(), client, tx8)
 	if err != nil {
 		log.Fatalf("Tx receipt failed: %v", err)
 	}
-	fmt.Printf("Tally Gas used: %d\n", receipt7.GasUsed)
+	fmt.Printf("PVerifyTally Gas used: %d\n", receipt8.GasUsed)
+
+	auth6 := utils.Transact(client, privatekey, big.NewInt(0))
+	tx6, _ := Contract.PVerify(auth6, PTindexTallierSet, PTDecShareSet, PTa1Set, PTa2Set, PTchallengeSet, PTzSet, big.NewInt(int64(threshold)))
+
+	receipt6, err := bind.WaitMined(context.Background(), client, tx6)
+	if err != nil {
+		log.Fatalf("Tx receipt failed: %v", err)
+	}
+	fmt.Printf("PVerify Gas used: %d\n", receipt6.GasUsed)
+	fmt.Printf("Tally Gas used: %d\n", receipt8.GasUsed-receipt6.GasUsed)
 	TallyResult, _ := Contract.GetTallyValue(&bind.CallOpts{})
 	//fmt.Printf("The tally results are %v\n", TallyResult)
 	fmt.Printf("=================================Finish the Tallying phase==========================================\n")
