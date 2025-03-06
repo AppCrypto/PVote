@@ -12,9 +12,9 @@ import (
 
 	"PVote/compile/contract"
 	"PVote/utils"
+	"flag"
 	"log"
 	"math/big"
-
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -49,9 +49,23 @@ func main() {
 	//The algorithms in Setup phase: PVSS.Setup and ZKRP.Setup
 
 	//Talliers:[4,6,8,10,12,14,16,18,20,22,24,26,28,30]
-	numTalliers := 10
+	nTallier := flag.Int("n", 30, "numTalliers")
+	lCandidates := flag.Int("l", 7, "numCandidates")
+
+	flag.Parse()
+
+	_ = flag.Args()
+
+	//Init the public parameters
+	//The algorithms in Setup phase: PVSS.Setup and ZKRP.Setup
+
+	// lc := flag.Int("lc", 1, "lcccc")
+	// args := os.Args[1:]
+	//Talliers:[4,6,8,10,12,14,16,18,20,22,24,26,28,30]
+	numTalliers := *nTallier
 	//Candidates
-	numCandidates := 2
+	numCandidates := *lCandidates
+
 	//Voters:[30,60,90,120,150,180,210,240,270,300]
 	numVoters := 1
 	threshold := (numTalliers + numCandidates) / 2
