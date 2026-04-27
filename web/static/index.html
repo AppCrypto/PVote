@@ -13,9 +13,9 @@
     <div class="page-shell">
       <header class="hero card">
         <div class="hero-copy">
-          <p class="eyebrow">PVote Protocol Studio</p>          
+          <p class="eyebrow">PVote Protocol Studio</p>
           <p class="hero-text">
-            This page showcases PVote’s voting demo, which includes the initiator, voter, and tallyer, and fully invokes both <code>PVSS</code> and <code>ZKRP</code>.            
+            This page demonstrates the full PVote flow across initiator, voter, and tallier roles, while also settling role-based stake and rewards on a local Ganache chain.
           </p>
           <div class="hero-chips">
             <span class="chip chip-strong" id="phase-chip">Setup</span>
@@ -67,7 +67,7 @@
                     <h2>Configure protocol parameters</h2>
                   </div>
                   <p class="section-copy">
-                    Regenerate the public parameters, tallier key pairs, candidate count, threshold, and scoring range.
+                    Regenerate the cryptographic session, set the Ganache escrow amounts, and define how stake rewards are split across roles.
                   </p>
                 </div>
 
@@ -92,24 +92,61 @@
                     <span>Range Max</span>
                     <input id="setup-range-max" name="rangeMax" type="number" min="0" required />
                   </label>
+                  <label>
+                    <span>Initiator Escrow (ETH)</span>
+                    <input id="setup-initiator-escrow" name="initiatorEscrowEth" type="number" min="0" step="0.001" required />
+                  </label>
+                  <label>
+                    <span>Voter Stake (ETH)</span>
+                    <input id="setup-voter-stake" name="voterStakeEth" type="number" min="0" step="0.001" required />
+                  </label>
+                  <label>
+                    <span>Tallier Stake (ETH)</span>
+                    <input id="setup-tallier-stake" name="tallierStakeEth" type="number" min="0" step="0.001" required />
+                  </label>
+                  <label>
+                    <span>Initiator Reward %</span>
+                    <input id="setup-initiator-reward" name="initiatorRewardPercent" type="number" min="0" max="100" required />
+                  </label>
+                  <label>
+                    <span>Voter Reward %</span>
+                    <input id="setup-voter-reward" name="voterRewardPercent" type="number" min="0" max="100" required />
+                  </label>
+                  <label>
+                    <span>Tallier Reward %</span>
+                    <input id="setup-tallier-reward" name="tallierRewardPercent" type="number" min="0" max="100" required />
+                  </label>
                   <div class="form-actions">
                     <button class="button-primary" type="submit">Rebuild Session</button>
                   </div>
                 </form>
+
+                <div class="chain-banner">
+                  <div>
+                    <p class="finalize-label">Ganache Escrow</p>
+                    <p class="finalize-note" id="chain-status">Checking local chain status.</p>
+                  </div>
+                  <div class="action-row">
+                    <button class="button-secondary" id="fund-escrow-button" type="button">Fund Initiator Escrow</button>
+                    <button class="button-secondary" id="withdraw-initiator-button" type="button">Withdraw Initiator Share</button>
+                  </div>
+                </div>
               </article>
 
               <article class="card panel-card">
                 <div class="panel-head">
                   <div>
                     <p class="section-kicker">Shared State</p>
-                    <h2>Current public parameters and aggregate state</h2>
+                    <h2>Cryptographic state and on-chain escrow</h2>
                   </div>
                   <p class="section-copy">
-                    Inspect compact fingerprints of the current session's public parameters, tallier public keys, and aggregated ciphertext state.
+                    Inspect public parameters, aggregated ciphertexts, the escrow contract, and the current role balances tracked on Ganache.
                   </p>
                 </div>
 
                 <div class="stats-grid" id="param-grid"></div>
+
+                <div class="escrow-grid" id="chain-overview"></div>
 
                 <div class="split-columns">
                   <div>
@@ -151,10 +188,14 @@
                     <input id="vote-alias" type="text" maxlength="32" placeholder="For example: Alice / Voter 01" />
                   </label>
 
+                  <p class="inline-note" id="vote-stake-note">
+                    Each ballot also escrows the configured voter stake on Ganache before the cryptographic record is accepted.
+                  </p>
+
                   <div id="score-grid" class="score-grid"></div>
 
                   <div class="form-actions">
-                    <button class="button-primary" id="vote-submit" type="submit">Submit Ballot</button>
+                    <button class="button-primary" id="vote-submit" type="submit">Stake & Submit Ballot</button>
                   </div>
                 </form>
               </article>
@@ -183,7 +224,7 @@
                     <h2>Publish decryption shares one by one</h2>
                   </div>
                   <p class="section-copy">
-                    Once the threshold is reached, these verified shares can recover the blinding commitments and reveal the final tally.
+                    Talliers first lock their on-chain stake, then publish verified decryption shares. The first honest quorum can unlock the final tally and rewards.
                   </p>
                 </div>
 
@@ -205,7 +246,7 @@
                     <h2>Final tally result</h2>
                   </div>
                   <p class="section-copy">
-                    The recovered result shows each candidate's total score together with a plaintext cross-check from the backend.
+                    The recovered result shows each candidate's total score together with plaintext cross-checks and the final escrow settlement state.
                   </p>
                 </div>
 

@@ -35,11 +35,17 @@ type App struct {
 }
 
 type DemoConfig struct {
-	NumTalliers   int `json:"numTalliers"`
-	NumCandidates int `json:"numCandidates"`
-	Threshold     int `json:"threshold"`
-	RangeMin      int `json:"rangeMin"`
-	RangeMax      int `json:"rangeMax"`
+	NumTalliers            int    `json:"numTalliers"`
+	NumCandidates          int    `json:"numCandidates"`
+	Threshold              int    `json:"threshold"`
+	RangeMin               int    `json:"rangeMin"`
+	RangeMax               int    `json:"rangeMax"`
+	InitiatorEscrowETH     string `json:"initiatorEscrowEth"`
+	VoterStakeETH          string `json:"voterStakeEth"`
+	TallierStakeETH        string `json:"tallierStakeEth"`
+	InitiatorRewardPercent int    `json:"initiatorRewardPercent"`
+	VoterRewardPercent     int    `json:"voterRewardPercent"`
+	TallierRewardPercent   int    `json:"tallierRewardPercent"`
 }
 
 type DemoState struct {
@@ -53,6 +59,8 @@ type DemoState struct {
 	Votes       []*VoterRecord
 	Decryptions map[int]*TallierRecord
 	Tally       *TallyRecord
+	Chain       *StakeChain
+	ChainError  string
 	Events      []EventRecord
 	CreatedAt   time.Time
 }
@@ -92,11 +100,17 @@ type EventRecord struct {
 }
 
 type SetupRequest struct {
-	NumTalliers   int `json:"numTalliers"`
-	NumCandidates int `json:"numCandidates"`
-	Threshold     int `json:"threshold"`
-	RangeMin      int `json:"rangeMin"`
-	RangeMax      int `json:"rangeMax"`
+	NumTalliers            int    `json:"numTalliers"`
+	NumCandidates          int    `json:"numCandidates"`
+	Threshold              int    `json:"threshold"`
+	RangeMin               int    `json:"rangeMin"`
+	RangeMax               int    `json:"rangeMax"`
+	InitiatorEscrowETH     string `json:"initiatorEscrowEth"`
+	VoterStakeETH          string `json:"voterStakeEth"`
+	TallierStakeETH        string `json:"tallierStakeEth"`
+	InitiatorRewardPercent int    `json:"initiatorRewardPercent"`
+	VoterRewardPercent     int    `json:"voterRewardPercent"`
+	TallierRewardPercent   int    `json:"tallierRewardPercent"`
 }
 
 type VoteRequest struct {
@@ -113,6 +127,7 @@ type APIResponse struct {
 type StateSnapshot struct {
 	Meta      MetaSnapshot      `json:"meta"`
 	Overview  OverviewSnapshot  `json:"overview"`
+	Chain     ChainSnapshot     `json:"chain"`
 	Initiator InitiatorSnapshot `json:"initiator"`
 	Voters    []VoterSnapshot   `json:"voters"`
 	Talliers  []TallierSnapshot `json:"talliers"`
@@ -127,15 +142,18 @@ type MetaSnapshot struct {
 }
 
 type OverviewSnapshot struct {
-	VoteCount          int    `json:"voteCount"`
-	VerifiedVotes      int    `json:"verifiedVotes"`
-	DecryptionCount    int    `json:"decryptionCount"`
-	Threshold          int    `json:"threshold"`
-	RangeLabel         string `json:"rangeLabel"`
-	CanVote            bool   `json:"canVote"`
-	CanDecrypt         bool   `json:"canDecrypt"`
-	CanFinalize        bool   `json:"canFinalize"`
-	PlaintextAvailable bool   `json:"plaintextAvailable"`
+	VoteCount           int    `json:"voteCount"`
+	VerifiedVotes       int    `json:"verifiedVotes"`
+	DecryptionCount     int    `json:"decryptionCount"`
+	Threshold           int    `json:"threshold"`
+	RangeLabel          string `json:"rangeLabel"`
+	ChainAvailable      bool   `json:"chainAvailable"`
+	CanFundInitiator    bool   `json:"canFundInitiator"`
+	RemainingVoterSlots int    `json:"remainingVoterSlots"`
+	CanVote             bool   `json:"canVote"`
+	CanDecrypt          bool   `json:"canDecrypt"`
+	CanFinalize         bool   `json:"canFinalize"`
+	PlaintextAvailable  bool   `json:"plaintextAvailable"`
 }
 
 type InitiatorSnapshot struct {
@@ -164,25 +182,27 @@ type AggregateSnapshot struct {
 }
 
 type VoterSnapshot struct {
-	ID              int      `json:"id"`
-	Alias           string   `json:"alias"`
-	Scores          []int    `json:"scores"`
-	PVSSVerified    bool     `json:"pvssVerified"`
-	RangeVerified   bool     `json:"rangeVerified"`
-	SubmittedAt     string   `json:"submittedAt"`
-	BindCommitments []string `json:"bindCommitments"`
-	EncryptedShares []string `json:"encryptedShares"`
-	BallotCipher    []string `json:"ballotCipher"`
+	ID              int             `json:"id"`
+	Alias           string          `json:"alias"`
+	Scores          []int           `json:"scores"`
+	PVSSVerified    bool            `json:"pvssVerified"`
+	RangeVerified   bool            `json:"rangeVerified"`
+	SubmittedAt     string          `json:"submittedAt"`
+	BindCommitments []string        `json:"bindCommitments"`
+	EncryptedShares []string        `json:"encryptedShares"`
+	BallotCipher    []string        `json:"ballotCipher"`
+	Stake           FinanceSnapshot `json:"stake"`
 }
 
 type TallierSnapshot struct {
-	ID           int    `json:"id"`
-	PublicKey    string `json:"publicKey"`
-	HasDecrypted bool   `json:"hasDecrypted"`
-	Verified     bool   `json:"verified"`
-	Share        string `json:"share"`
-	Proof        string `json:"proof"`
-	DecryptedAt  string `json:"decryptedAt"`
+	ID           int             `json:"id"`
+	PublicKey    string          `json:"publicKey"`
+	HasDecrypted bool            `json:"hasDecrypted"`
+	Verified     bool            `json:"verified"`
+	Share        string          `json:"share"`
+	Proof        string          `json:"proof"`
+	DecryptedAt  string          `json:"decryptedAt"`
+	Stake        FinanceSnapshot `json:"stake"`
 }
 
 type TallySnapshot struct {
@@ -203,6 +223,36 @@ type EventSnapshot struct {
 	Title  string `json:"title"`
 	Detail string `json:"detail"`
 	At     string `json:"at"`
+}
+
+type ChainSnapshot struct {
+	Available          bool            `json:"available"`
+	Status             string          `json:"status"`
+	RPCURL             string          `json:"rpcUrl"`
+	ContractAddress    string          `json:"contractAddress"`
+	EscrowFunded       bool            `json:"escrowFunded"`
+	Settled            bool            `json:"settled"`
+	InitiatorEscrowEth string          `json:"initiatorEscrowEth"`
+	VoterStakeEth      string          `json:"voterStakeEth"`
+	TallierStakeEth    string          `json:"tallierStakeEth"`
+	RewardSplit        string          `json:"rewardSplit"`
+	TotalEscrowEth     string          `json:"totalEscrowEth"`
+	RewardPoolEth      string          `json:"rewardPoolEth"`
+	ContractBalanceEth string          `json:"contractBalanceEth"`
+	MaxVoters          int             `json:"maxVoters"`
+	Initiator          FinanceSnapshot `json:"initiator"`
+}
+
+type FinanceSnapshot struct {
+	Address          string `json:"address"`
+	DepositedEth     string `json:"depositedEth"`
+	ClaimableEth     string `json:"claimableEth"`
+	WalletBalanceEth string `json:"walletBalanceEth"`
+	Staked           bool   `json:"staked"`
+	Honest           bool   `json:"honest"`
+	Withdrawn        bool   `json:"withdrawn"`
+	CanStake         bool   `json:"canStake"`
+	CanWithdraw      bool   `json:"canWithdraw"`
 }
 
 func NewApp() (*App, error) {
@@ -234,8 +284,13 @@ func (a *App) routes() http.Handler {
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(a.assets))))
 	mux.HandleFunc("GET /api/state", a.handleState)
 	mux.HandleFunc("POST /api/setup", a.handleSetup)
+	mux.HandleFunc("POST /api/initiator/escrow", a.handleFundInitiatorEscrow)
+	mux.HandleFunc("POST /api/initiator/withdraw", a.handleWithdrawInitiator)
 	mux.HandleFunc("POST /api/voters", a.handleVote)
+	mux.HandleFunc("POST /api/voters/{id}/withdraw", a.handleWithdrawVoter)
+	mux.HandleFunc("POST /api/talliers/{id}/stake", a.handleStakeTallier)
 	mux.HandleFunc("POST /api/talliers/{id}/decrypt", a.handleDecryptTallier)
+	mux.HandleFunc("POST /api/talliers/{id}/withdraw", a.handleWithdrawTallier)
 	mux.HandleFunc("POST /api/tally/finalize", a.handleFinalizeTally)
 	mux.HandleFunc("/", a.handleIndex)
 	return mux
@@ -266,11 +321,17 @@ func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state, err := newDemoState(DemoConfig{
-		NumTalliers:   req.NumTalliers,
-		NumCandidates: req.NumCandidates,
-		Threshold:     req.Threshold,
-		RangeMin:      req.RangeMin,
-		RangeMax:      req.RangeMax,
+		NumTalliers:            req.NumTalliers,
+		NumCandidates:          req.NumCandidates,
+		Threshold:              req.Threshold,
+		RangeMin:               req.RangeMin,
+		RangeMax:               req.RangeMax,
+		InitiatorEscrowETH:     req.InitiatorEscrowETH,
+		VoterStakeETH:          req.VoterStakeETH,
+		TallierStakeETH:        req.TallierStakeETH,
+		InitiatorRewardPercent: req.InitiatorRewardPercent,
+		VoterRewardPercent:     req.VoterRewardPercent,
+		TallierRewardPercent:   req.TallierRewardPercent,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -284,6 +345,40 @@ func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, APIResponse{
 		Message: "Initiator rebuilt the demo session.",
+		State:   snapshot,
+	})
+}
+
+func (a *App) handleFundInitiatorEscrow(w http.ResponseWriter, _ *http.Request) {
+	a.mu.Lock()
+	err := a.state.fundInitiatorEscrow()
+	snapshot := a.state.snapshot()
+	a.mu.Unlock()
+
+	if err != nil {
+		writeErrorWithState(w, http.StatusConflict, err, snapshot)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, APIResponse{
+		Message: "Initiator funded the on-chain reward escrow on Ganache.",
+		State:   snapshot,
+	})
+}
+
+func (a *App) handleWithdrawInitiator(w http.ResponseWriter, _ *http.Request) {
+	a.mu.Lock()
+	err := a.state.withdrawInitiator()
+	snapshot := a.state.snapshot()
+	a.mu.Unlock()
+
+	if err != nil {
+		writeErrorWithState(w, http.StatusConflict, err, snapshot)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, APIResponse{
+		Message: "Initiator withdrew the settled reward.",
 		State:   snapshot,
 	})
 }
@@ -305,8 +400,58 @@ func (a *App) handleVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	message := "Voter ballot accepted. Stake escrowed on Ganache and cryptographic proofs verified."
+	if !snapshot.Chain.Available {
+		message = "Voter ballot accepted off-chain. Cryptographic proofs verified; no Ganache stake or reward settlement is active."
+	}
 	writeJSON(w, http.StatusOK, APIResponse{
-		Message: "Voter ballot accepted. PVSS and range proofs both verified.",
+		Message: message,
+		State:   snapshot,
+	})
+}
+
+func (a *App) handleWithdrawVoter(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid voter id"))
+		return
+	}
+
+	a.mu.Lock()
+	err = a.state.withdrawVoter(id)
+	snapshot := a.state.snapshot()
+	a.mu.Unlock()
+
+	if err != nil {
+		writeErrorWithState(w, http.StatusConflict, err, snapshot)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, APIResponse{
+		Message: fmt.Sprintf("Voter %02d withdrew the settled stake and reward.", id),
+		State:   snapshot,
+	})
+}
+
+func (a *App) handleStakeTallier(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid tallier id"))
+		return
+	}
+
+	a.mu.Lock()
+	err = a.state.stakeTallier(id)
+	snapshot := a.state.snapshot()
+	a.mu.Unlock()
+
+	if err != nil {
+		writeErrorWithState(w, http.StatusConflict, err, snapshot)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, APIResponse{
+		Message: fmt.Sprintf("Tallier %02d staked on Ganache and joined the tally committee.", id),
 		State:   snapshot,
 	})
 }
@@ -345,19 +490,52 @@ func (a *App) handleFinalizeTally(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
+	message := "Tallier quorum reached. Final tally reconstructed and escrow rewards settled on Ganache."
+	if !snapshot.Chain.Available {
+		message = "Tallier quorum reached. Final tally reconstructed off-chain; no Ganache reward settlement is active."
+	}
 	writeJSON(w, http.StatusOK, APIResponse{
-		Message: "Tallier quorum reached. Final tally reconstructed from encrypted commitments.",
+		Message: message,
+		State:   snapshot,
+	})
+}
+
+func (a *App) handleWithdrawTallier(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid tallier id"))
+		return
+	}
+
+	a.mu.Lock()
+	err = a.state.withdrawTallier(id)
+	snapshot := a.state.snapshot()
+	a.mu.Unlock()
+
+	if err != nil {
+		writeErrorWithState(w, http.StatusConflict, err, snapshot)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, APIResponse{
+		Message: fmt.Sprintf("Tallier %02d withdrew the settled stake and reward.", id),
 		State:   snapshot,
 	})
 }
 
 func defaultConfig() DemoConfig {
 	return DemoConfig{
-		NumTalliers:   4,
-		NumCandidates: 3,
-		Threshold:     3,
-		RangeMin:      0,
-		RangeMax:      5,
+		NumTalliers:            4,
+		NumCandidates:          3,
+		Threshold:              3,
+		RangeMin:               0,
+		RangeMax:               5,
+		InitiatorEscrowETH:     "6",
+		VoterStakeETH:          "1",
+		TallierStakeETH:        "1.5",
+		InitiatorRewardPercent: 10,
+		VoterRewardPercent:     45,
+		TallierRewardPercent:   45,
 	}
 }
 
@@ -402,6 +580,27 @@ func newDemoState(cfg DemoConfig) (*DemoState, error) {
 		),
 	)
 
+	chain, chainErr := NewStakeChain(cfg)
+	if chainErr != nil {
+		state.ChainError = chainErr.Error()
+		state.appendEvent(
+			"initiator",
+			"Ganache escrow unavailable",
+			fmt.Sprintf("The cryptographic demo is ready, but the local stake contract could not be deployed: %v.", chainErr),
+		)
+		return state, nil
+	}
+
+	state.Chain = chain
+	state.appendEvent(
+		"initiator",
+		"Ganache stake manager deployed",
+		fmt.Sprintf(
+			"Escrow contract %s tracks initiator funding, voter stakes, tallier stakes, and reward settlement.",
+			chain.ContractAddress.Hex(),
+		),
+	)
+
 	return state, nil
 }
 
@@ -421,6 +620,20 @@ func normalizeConfig(cfg DemoConfig) (DemoConfig, error) {
 	if cfg.Threshold == 0 {
 		cfg.Threshold = minInt(cfg.NumTalliers, maxInt(2, (cfg.NumTalliers+cfg.NumCandidates)/2))
 	}
+	if strings.TrimSpace(cfg.InitiatorEscrowETH) == "" {
+		cfg.InitiatorEscrowETH = defaults.InitiatorEscrowETH
+	}
+	if strings.TrimSpace(cfg.VoterStakeETH) == "" {
+		cfg.VoterStakeETH = defaults.VoterStakeETH
+	}
+	if strings.TrimSpace(cfg.TallierStakeETH) == "" {
+		cfg.TallierStakeETH = defaults.TallierStakeETH
+	}
+	if cfg.InitiatorRewardPercent == 0 && cfg.VoterRewardPercent == 0 && cfg.TallierRewardPercent == 0 {
+		cfg.InitiatorRewardPercent = defaults.InitiatorRewardPercent
+		cfg.VoterRewardPercent = defaults.VoterRewardPercent
+		cfg.TallierRewardPercent = defaults.TallierRewardPercent
+	}
 
 	if cfg.NumTalliers < 2 || cfg.NumTalliers > 8 {
 		return cfg, errors.New("numTalliers must be between 2 and 8")
@@ -436,6 +649,21 @@ func normalizeConfig(cfg DemoConfig) (DemoConfig, error) {
 	}
 	if cfg.Threshold < 2 || cfg.Threshold > cfg.NumTalliers {
 		return cfg, errors.New("threshold must be between 2 and numTalliers")
+	}
+	if cfg.InitiatorRewardPercent < 0 || cfg.VoterRewardPercent < 0 || cfg.TallierRewardPercent < 0 {
+		return cfg, errors.New("reward percentages must be non-negative")
+	}
+	if cfg.InitiatorRewardPercent+cfg.VoterRewardPercent+cfg.TallierRewardPercent != 100 {
+		return cfg, errors.New("reward percentages must sum to 100")
+	}
+	if _, err := parseETHToWei(cfg.InitiatorEscrowETH); err != nil {
+		return cfg, err
+	}
+	if _, err := parseETHToWei(cfg.VoterStakeETH); err != nil {
+		return cfg, err
+	}
+	if _, err := parseETHToWei(cfg.TallierStakeETH); err != nil {
+		return cfg, err
 	}
 
 	return cfg, nil
@@ -461,6 +689,7 @@ func (s *DemoState) submitVote(alias string, scores []int) error {
 	if strings.TrimSpace(alias) == "" {
 		alias = fmt.Sprintf("Voter %02d", len(s.Votes)+1)
 	}
+	nextVoterID := len(s.Votes) + 1
 
 	secret, err := rand.Int(rand.Reader, bn256.Order)
 	if err != nil {
@@ -507,6 +736,15 @@ func (s *DemoState) submitVote(alias string, scores []int) error {
 		}
 	}
 
+	if s.Chain != nil {
+		if err := s.ensureInitiatorEscrowFunded(); err != nil {
+			return err
+		}
+		if _, err := s.Chain.StakeVoter(nextVoterID); err != nil {
+			return err
+		}
+	}
+
 	for i := range s.AggregateC {
 		s.AggregateC[i] = new(bn256.G1).Add(s.AggregateC[i], share.C[i])
 	}
@@ -515,7 +753,7 @@ func (s *DemoState) submitVote(alias string, scores []int) error {
 	}
 
 	s.Votes = append(s.Votes, &VoterRecord{
-		ID:            len(s.Votes) + 1,
+		ID:            nextVoterID,
 		Alias:         alias,
 		Scores:        cloneInts(scores),
 		Share:         share,
@@ -526,10 +764,14 @@ func (s *DemoState) submitVote(alias string, scores []int) error {
 		SubmittedAt:   time.Now(),
 	})
 
+	stakeDetail := "an on-chain voter stake"
+	if s.Chain == nil {
+		stakeDetail = "an off-chain record without Ganache stake"
+	}
 	s.appendEvent(
 		"voter",
 		fmt.Sprintf("%s cast a ballot", alias),
-		fmt.Sprintf("Scores %v were encrypted into PVSS shares and candidate commitments.", scores),
+		fmt.Sprintf("Scores %v were encrypted into PVSS shares, candidate commitments, and %s.", scores, stakeDetail),
 	)
 
 	return nil
@@ -547,6 +789,15 @@ func (s *DemoState) decryptTallier(id int) error {
 	}
 	if _, exists := s.Decryptions[id]; exists {
 		return errors.New("this tallier already published a decryption share")
+	}
+	if s.Chain != nil {
+		participant, err := s.Chain.ReadTallier(id)
+		if err != nil {
+			return fmt.Errorf("read tallier stake state: %w", err)
+		}
+		if !participant.Staked {
+			return errors.New("this tallier must stake on Ganache before decrypting")
+		}
 	}
 
 	share, proof := PVSS.Decrypt(s.PP.G0, s.TallierPKs[id-1], s.AggregateC[id-1], s.TallierSKs[id-1])
@@ -614,6 +865,22 @@ func (s *DemoState) finalizeTally() error {
 		}
 	}
 
+	if s.Chain != nil {
+		honestTallierIDs := make([]int, s.Config.Threshold)
+		for i, rec := range verified[:s.Config.Threshold] {
+			honestTallierIDs[i] = rec.ID
+		}
+
+		honestVoterIDs := make([]int, len(s.Votes))
+		for i := range s.Votes {
+			honestVoterIDs[i] = s.Votes[i].ID
+		}
+
+		if err := s.Chain.SettleRewards(honestVoterIDs, honestTallierIDs); err != nil {
+			return err
+		}
+	}
+
 	s.Tally = &TallyRecord{
 		Results:     results,
 		Points:      points,
@@ -627,6 +894,95 @@ func (s *DemoState) finalizeTally() error {
 		fmt.Sprintf("Recovered %d candidate totals using %d verified tallier shares.", s.Config.NumCandidates, s.Config.Threshold),
 	)
 
+	return nil
+}
+
+func (s *DemoState) fundInitiatorEscrow() error {
+	if s.Chain == nil {
+		return errors.New("ganache stake manager is not available")
+	}
+	if err := s.Chain.FundInitiatorEscrow(); err != nil {
+		return err
+	}
+	s.appendEvent(
+		"initiator",
+		"Initiator funded reward escrow",
+		fmt.Sprintf("The initiator escrowed %s ETH on Ganache to seed the reward pool.", s.Config.InitiatorEscrowETH),
+	)
+	return nil
+}
+
+func (s *DemoState) stakeTallier(id int) error {
+	if s.Chain == nil {
+		return errors.New("ganache stake manager is not available")
+	}
+	if err := s.Chain.StakeTallier(id); err != nil {
+		return err
+	}
+	s.appendEvent(
+		"tallier",
+		fmt.Sprintf("Tallier %02d staked", id),
+		fmt.Sprintf("Tallier %02d locked %s ETH on Ganache and is now eligible to decrypt.", id, s.Config.TallierStakeETH),
+	)
+	return nil
+}
+
+func (s *DemoState) withdrawInitiator() error {
+	if s.Chain == nil {
+		return errors.New("ganache stake manager is not available")
+	}
+	if err := s.Chain.WithdrawInitiator(); err != nil {
+		return err
+	}
+	s.appendEvent(
+		"initiator",
+		"Initiator withdrew settled funds",
+		"The initiator collected the settled reward share from the Ganache escrow contract.",
+	)
+	return nil
+}
+
+func (s *DemoState) withdrawVoter(id int) error {
+	if s.Chain == nil {
+		return errors.New("ganache stake manager is not available")
+	}
+	if err := s.Chain.WithdrawVoter(id); err != nil {
+		return err
+	}
+	s.appendEvent(
+		"voter",
+		fmt.Sprintf("Voter %02d withdrew settled funds", id),
+		fmt.Sprintf("Voter %02d reclaimed the stake principal and reward from Ganache.", id),
+	)
+	return nil
+}
+
+func (s *DemoState) withdrawTallier(id int) error {
+	if s.Chain == nil {
+		return errors.New("ganache stake manager is not available")
+	}
+	if err := s.Chain.WithdrawTallier(id); err != nil {
+		return err
+	}
+	s.appendEvent(
+		"tallier",
+		fmt.Sprintf("Tallier %02d withdrew settled funds", id),
+		fmt.Sprintf("Tallier %02d reclaimed the stake principal and reward from Ganache.", id),
+	)
+	return nil
+}
+
+func (s *DemoState) ensureInitiatorEscrowFunded() error {
+	if s.Chain == nil {
+		return nil
+	}
+	overview, err := s.Chain.ReadOverview()
+	if err != nil {
+		return fmt.Errorf("read ganache escrow state: %w", err)
+	}
+	if !overview.EscrowFunded {
+		return errors.New("initiator must fund the Ganache reward escrow before voters can stake and vote")
+	}
 	return nil
 }
 
@@ -674,6 +1030,12 @@ func (s *DemoState) snapshot() StateSnapshot {
 		}
 	}
 
+	chainSnapshot, voterStake, tallierStake := s.buildChainSnapshot()
+	remainingVoterSlots := 0
+	if s.Chain != nil {
+		remainingVoterSlots = maxInt(chainSnapshot.MaxVoters-len(s.Votes), 0)
+	}
+
 	tallierKeys := make([]TallierKeySnapshot, len(s.TallierPKs))
 	for i, pk := range s.TallierPKs {
 		tallierKeys[i] = TallierKeySnapshot{
@@ -707,6 +1069,11 @@ func (s *DemoState) snapshot() StateSnapshot {
 			encrypted[idx] = pointFingerprint(vote.Share.C[idx])
 		}
 
+		finance, exists := voterStake[vote.ID]
+		if !exists {
+			finance = zeroFinanceSnapshot()
+		}
+
 		voters[i] = VoterSnapshot{
 			ID:              vote.ID,
 			Alias:           vote.Alias,
@@ -717,6 +1084,7 @@ func (s *DemoState) snapshot() StateSnapshot {
 			BindCommitments: binds,
 			EncryptedShares: encrypted,
 			BallotCipher:    ballots,
+			Stake:           finance,
 		}
 	}
 
@@ -733,6 +1101,11 @@ func (s *DemoState) snapshot() StateSnapshot {
 			talliers[i].Share = pointFingerprint(rec.Share)
 			talliers[i].Proof = scalarFingerprint(rec.Proof.C)
 			talliers[i].DecryptedAt = rec.DecryptedAt.Format("15:04:05")
+		}
+		if finance, exists := tallierStake[i+1]; exists {
+			talliers[i].Stake = finance
+		} else {
+			talliers[i].Stake = zeroFinanceSnapshot()
 		}
 	}
 
@@ -753,16 +1126,20 @@ func (s *DemoState) snapshot() StateSnapshot {
 			GeneratedAt: time.Now().Format("15:04:05"),
 		},
 		Overview: OverviewSnapshot{
-			VoteCount:          len(s.Votes),
-			VerifiedVotes:      verifiedVotes,
-			DecryptionCount:    len(s.verifiedTalliers()),
-			Threshold:          s.Config.Threshold,
-			RangeLabel:         fmt.Sprintf("[%d, %d]", s.Config.RangeMin, s.Config.RangeMax),
-			CanVote:            s.Tally == nil && len(s.Decryptions) == 0,
-			CanDecrypt:         len(s.Votes) > 0 && s.Tally == nil,
-			CanFinalize:        s.Tally == nil && len(s.verifiedTalliers()) >= s.Config.Threshold,
-			PlaintextAvailable: s.Tally != nil,
+			VoteCount:           len(s.Votes),
+			VerifiedVotes:       verifiedVotes,
+			DecryptionCount:     len(s.verifiedTalliers()),
+			Threshold:           s.Config.Threshold,
+			RangeLabel:          fmt.Sprintf("[%d, %d]", s.Config.RangeMin, s.Config.RangeMax),
+			ChainAvailable:      s.Chain != nil,
+			CanFundInitiator:    s.Chain != nil && !chainSnapshot.EscrowFunded,
+			RemainingVoterSlots: remainingVoterSlots,
+			CanVote:             s.Tally == nil && len(s.Decryptions) == 0 && (s.Chain == nil || (chainSnapshot.EscrowFunded && remainingVoterSlots > 0)),
+			CanDecrypt:          len(s.Votes) > 0 && s.Tally == nil,
+			CanFinalize:         s.Tally == nil && len(s.verifiedTalliers()) >= s.Config.Threshold,
+			PlaintextAvailable:  s.Tally != nil,
 		},
+		Chain: chainSnapshot,
 		Initiator: InitiatorSnapshot{
 			Config:          s.Config,
 			CandidateLabels: candidateLabels(s.Config.NumCandidates),
@@ -800,6 +1177,118 @@ func (s *DemoState) snapshot() StateSnapshot {
 	}
 
 	return snapshot
+}
+
+func (s *DemoState) buildChainSnapshot() (ChainSnapshot, map[int]FinanceSnapshot, map[int]FinanceSnapshot) {
+	voterSnapshots := make(map[int]FinanceSnapshot, len(s.Votes))
+	tallierSnapshots := make(map[int]FinanceSnapshot, s.Config.NumTalliers)
+
+	base := ChainSnapshot{
+		Available:          s.Chain != nil,
+		Status:             "Ganache stake manager unavailable",
+		RPCURL:             ganacheURL,
+		InitiatorEscrowEth: s.Config.InitiatorEscrowETH,
+		VoterStakeEth:      s.Config.VoterStakeETH,
+		TallierStakeEth:    s.Config.TallierStakeETH,
+		TotalEscrowEth:     "0.000",
+		RewardPoolEth:      "0.000",
+		ContractBalanceEth: "0.000",
+		RewardSplit: fmt.Sprintf(
+			"%d%% initiator / %d%% voters / %d%% talliers",
+			s.Config.InitiatorRewardPercent,
+			s.Config.VoterRewardPercent,
+			s.Config.TallierRewardPercent,
+		),
+	}
+	for i := 1; i <= s.Config.NumTalliers; i++ {
+		tallierSnapshots[i] = zeroFinanceSnapshot()
+	}
+
+	if s.Chain == nil {
+		if s.ChainError != "" {
+			base.Status = s.ChainError
+		}
+		base.Initiator = zeroFinanceSnapshot()
+		return base, voterSnapshots, tallierSnapshots
+	}
+
+	base.ContractAddress = s.Chain.ContractAddress.Hex()
+	base.MaxVoters = len(s.Chain.Voters)
+
+	overview, err := s.Chain.ReadOverview()
+	if err != nil {
+		base.Status = fmt.Sprintf("Ganache read failed: %v", err)
+		base.Initiator = zeroFinanceSnapshot()
+		return base, voterSnapshots, tallierSnapshots
+	}
+
+	initiator, err := s.Chain.ReadInitiator()
+	if err != nil {
+		base.Status = fmt.Sprintf("Ganache initiator read failed: %v", err)
+		base.Initiator = zeroFinanceSnapshot()
+		return base, voterSnapshots, tallierSnapshots
+	}
+
+	base.Available = true
+	base.EscrowFunded = overview.EscrowFunded
+	base.Settled = overview.Settled
+	base.TotalEscrowEth = formatWeiToETH(overview.TotalEscrow)
+	base.RewardPoolEth = formatWeiToETH(overview.RewardPool)
+	base.ContractBalanceEth = formatWeiToETH(overview.ContractBalance)
+	base.Initiator = participantSnapshot(initiator, !initiator.Staked, initiator.Claimable.Sign() > 0 && !initiator.Withdrawn)
+
+	switch {
+	case overview.Settled:
+		base.Status = "Rewards settled on Ganache"
+	case overview.EscrowFunded:
+		base.Status = "Escrow funded on Ganache"
+	default:
+		base.Status = "Awaiting initiator escrow funding"
+	}
+
+	for _, vote := range s.Votes {
+		participant, err := s.Chain.ReadVoter(vote.ID)
+		if err != nil {
+			voterSnapshots[vote.ID] = FinanceSnapshot{}
+			continue
+		}
+		voterSnapshots[vote.ID] = participantSnapshot(participant, false, participant.Claimable.Sign() > 0 && !participant.Withdrawn)
+	}
+
+	for i := 1; i <= s.Config.NumTalliers; i++ {
+		participant, err := s.Chain.ReadTallier(i)
+		if err != nil {
+			continue
+		}
+		tallierSnapshots[i] = participantSnapshot(participant, !participant.Staked && !overview.Settled, participant.Claimable.Sign() > 0 && !participant.Withdrawn)
+	}
+
+	return base, voterSnapshots, tallierSnapshots
+}
+
+func participantSnapshot(participant *ChainParticipant, canStake bool, canWithdraw bool) FinanceSnapshot {
+	if participant == nil {
+		return zeroFinanceSnapshot()
+	}
+	return FinanceSnapshot{
+		Address:          participant.Address.Hex(),
+		DepositedEth:     formatWeiToETH(participant.Deposited),
+		ClaimableEth:     formatWeiToETH(participant.Claimable),
+		WalletBalanceEth: formatWeiToETH(participant.WalletBalance),
+		Staked:           participant.Staked,
+		Honest:           participant.Honest,
+		Withdrawn:        participant.Withdrawn,
+		CanStake:         canStake,
+		CanWithdraw:      canWithdraw,
+	}
+}
+
+func zeroFinanceSnapshot() FinanceSnapshot {
+	return FinanceSnapshot{
+		DepositedEth:     "0.000",
+		ClaimableEth:     "0.000",
+		WalletBalanceEth: "0.000",
+	}
 }
 
 func (s *DemoState) appendEvent(role, title, detail string) {

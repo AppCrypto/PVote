@@ -1,60 +1,93 @@
+# PVote
 
+PVote is a Go implementation and demo workspace for a privacy-preserving voting protocol. It includes the core cryptographic modules, a command-line demo, Solidity contract bindings, and a single-page web demo that simulates initiator, voter, and tallier roles.
 
+## Requirements
 
-# Pre-requisites
+- Go 1.22+
+- Ganache or ganache-cli
+- Solidity compiler, if you need to regenerate contract artifacts
+- `abigen`, if you need to regenerate Go bindings from Solidity contracts
 
-* `Golang`  https://go.dev/dl/   
+Install `abigen`:
 
-* `Solidity`  https://docs.soliditylang.org/en/v0.8.2/installing-solidity.html  Version: 0.8.20
+```bash
+go install github.com/ethereum/go-ethereum/cmd/abigen@v1.14.3
+```
 
-* `Solidity compiler (solc)`  https://docs.soliditylang.org/en/latest/installing-solidity.html  
-Version: 0.8.25-develop
+## Project Layout
 
-* `Ganache-cli`  https://www.npmjs.com/package/ganache-cli
-    
-* `Abigen`    Version: v1.14.3
-    ```bash
-    go get -u github.com/ethereum/go-ethereum
-    go install github.com/ethereum/go-ethereum/cmd/abigen@v1.14.3
-    ```
+- `main.go`: command-line demo entry point.
+- `crypto/PVSS`: PVSS implementation used for encrypted share generation and verification.
+- `crypto/ZKRP`: zero-knowledge range proof implementation.
+- `crypto/Convert`: helper conversions for cryptographic data.
+- `utils`: shared utility code.
+- `compile`: legacy Solidity contract source and compilation script.
+- `web`: Go backend and static frontend for the browser-based PVote demo.
+- `web/static`: HTML, CSS, and JavaScript for the single-page role simulation UI.
+- `web/contract`: stake manager Solidity contract, ABI/bin artifacts, and generated Go binding.
+- `paper`: protocol notes and paper-related files.
+- `genPrvKey_Linux.sh`, `genPrvKey_Mac.sh`: scripts for generating local demo accounts into `.env`.
 
+## Setup
 
-# File description
+Generate or refresh `.env` accounts:
 
-* `main.go`   run this file to test the functionalities of the framework.
+```bash
+bash genPrvKey_Mac.sh
+```
 
-* `compile/contract/`  The folder stores contract source code file (.sol) and generated go contract file.
+On Linux:
 
-* `compile/compile.sh`  The script file compiles solidity and generates go contract file.
+```bash
+bash genPrvKey_Linux.sh
+```
 
-* `genPrvKey.sh`  The script file generates accounts and stores in the`.env` file.
-#########
+Start Ganache with the mnemonic expected by the demo accounts:
 
-# How to run
+```bash
+ganache --mnemonic "PVote" -l 90071992547 -e 1000
+```
 
-1. Generate private keys to generate the `.env` file in different Linux os or Mac os
+If you start Ganache with different accounts, regenerate `.env` so the private keys match the Ganache wallets.
 
-    ```bash(Linux os)
-    bash genPrvKey_Linux.sh
-    ```
+## Run the Command-Line Demo
 
-    ```bash(Mac os)
-    bash genPrvKey_Mac.sh
-    ```
+```bash
+go run main.go
+```
 
-2. start ganache
+## Run the Web Demo
 
-    ```bash
-    ganache --mnemonic "PVote" -l 90071992547 -e 1000
-    ```
+Start Ganache first, then run:
 
-3. Compile the smart contract code
+```bash
+go run ./web
+```
 
-    ```bash
-    bash compile.sh
-    ```
+Open the printed local URL in a browser, usually:
 
-4. Run the main.go
-    ```bash
-    go run main.go
-    ```
+```text
+http://localhost:8080
+```
+
+The web page provides tabs for:
+
+- Initiator: configure protocol parameters, deploy/fund the Ganache escrow, and inspect shared state.
+- Voter: submit ballots and automatically lock voter stake when Ganache is available.
+- Tallier: lock tallier stake, publish decryption shares, finalize the tally, and withdraw settled rewards.
+
+## Regenerate Web Contract Bindings
+
+Only run this when `web/contract/StakeManager.sol` changes:
+
+```bash
+cd web/contract
+bash compile.sh
+```
+
+Then rerun the Go tests:
+
+```bash
+go test ./web ./crypto/... ./utils/...
+```
