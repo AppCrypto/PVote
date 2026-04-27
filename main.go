@@ -458,9 +458,8 @@ func main() {
 	endtime = time.Now().UnixMicro()
 	fmt.Printf("Decrypt Time Used is %v us\n", (endtime-starttime)/1000)
 
-	//TODO:
-	//Upload decrypted shares and corresponding DLEQ proofs
-	//PVerify smart contracts verifies the correctness of each decrypted shares
+	// Upload threshold decrypted shares and their DLEQ proofs so the contract
+	// can validate each tallier response before reconstructing the tally.
 	var DecComCost float64 = 0
 	for i := 0; i < threshold; i++ {
 		//PVSS.Decrypt communication cost
@@ -485,6 +484,7 @@ func main() {
 		PTzSet[j] = shProof[j].Z
 	}
 
+	// Measure verification plus tally reconstruction together.
 	auth8 := utils.Transact(client, privatekey, big.NewInt(0))
 	tx8, _ := Contract.PVerifyTally(auth8, PTindexTallierSet, PTDecShareSet, PTa1Set, PTa2Set, PTchallengeSet, PTzSet, big.NewInt(int64(threshold)), big.NewInt(int64(numCandidates)))
 
@@ -494,6 +494,7 @@ func main() {
 	}
 	fmt.Printf("PVerifyTally Gas used: %d\n", receipt8.GasUsed)
 
+	// Measure the verification-only path separately so tally gas can be isolated.
 	auth6 := utils.Transact(client, privatekey, big.NewInt(0))
 	tx6, _ := Contract.PVerify(auth6, PTindexTallierSet, PTDecShareSet, PTa1Set, PTa2Set, PTchallengeSet, PTzSet, big.NewInt(int64(threshold)))
 

@@ -14,12 +14,14 @@ type PP struct {
 	H0      *bn256.G1
 	G1      *bn256.G2
 	PKI     *bn256.G2
+	// Sigma_k are the signer-generated witnesses for the allowed range [a, b].
 	Sigma_k []*bn256.G1
 }
 
 type Proof struct {
 	Ej  *bn256.G1
 	Fj  *bn256.GT
+	// Fj1/Fj2 split Fj into EVM-friendly pieces for on-chain pairing checks.
 	Fj1 *bn256.G1
 	Fj2 *bn256.G1
 	Uj  *bn256.G1
@@ -31,6 +33,7 @@ type Proof struct {
 }
 
 func Setup(a int, b int) (*big.Int, PP) {
+	// Build the public parameters once for a fixed ballot range.
 	g0 := new(bn256.G1).ScalarBaseMult(big.NewInt(int64(1)))
 	hScalar, _ := new(big.Int).SetString("9868996996480530350723936346388037348513707152826932716320380442065450531909", 10)
 	h0 := new(bn256.G1).ScalarBaseMult(hScalar)
@@ -73,6 +76,7 @@ func EvaluatePolynomial(coefficients []*big.Int, x, order *big.Int) *big.Int {
 }
 
 func GenProof(g0 *bn256.G1, h0 *bn256.G1, g1 *bn256.G2, sj *big.Int, wj *big.Int, Uj *bn256.G1, sigma_wj *bn256.G1, d *big.Int, coefficients []*big.Int) *Proof {
+	// Prove that Uj commits to a value in range while binding sj to the PVSS polynomial.
 	b, _ := rand.Int(rand.Reader, bn256.Order)
 	_wj, _ := rand.Int(rand.Reader, bn256.Order)
 	_b, _ := rand.Int(rand.Reader, bn256.Order)
@@ -126,6 +130,7 @@ func GenProof(g0 *bn256.G1, h0 *bn256.G1, g1 *bn256.G2, sj *big.Int, wj *big.Int
 
 // Calculate the lagrange coefficient at d
 func Interpolation(d *big.Int, v []*bn256.G1, indices []*big.Int, threshold int) *bn256.G1 {
+	// Recover g^{p(d)} directly in the exponent from threshold commitments.
 
 	coefficient := make([]*big.Int, threshold)
 
@@ -156,6 +161,7 @@ func Interpolation(d *big.Int, v []*bn256.G1, indices []*big.Int, threshold int)
 }
 
 func Verify(g0 *bn256.G1, h0 *bn256.G1, g1 *bn256.G2, pk *bn256.G2, proof *Proof, Uj *bn256.G1, d *big.Int, v []*bn256.G1, indices []*big.Int, threshold int) bool {
+	// Check the PVSS consistency term, the Pedersen relation, and the pairing equation.
 	temp := Interpolation(d, v, indices, threshold)
 	temp = new(bn256.G1).ScalarMult(temp, proof.C)
 	temp = new(bn256.G1).Add(temp, new(bn256.G1).ScalarMult(h0, proof.Z3))

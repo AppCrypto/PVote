@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PVote Protocol Studio</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="glow glow-a"></div>
+    <div class="glow glow-b"></div>
+
+    <div class="page-shell">
+      <header class="hero card">
+        <div class="hero-copy">
+          <p class="eyebrow">PVote Protocol Studio</p>          
+          <p class="hero-text">
+            This page showcases PVote’s voting demo, which includes the initiator, voter, and tallyer, and fully invokes both <code>PVSS</code> and <code>ZKRP</code>.            
+          </p>
+          <div class="hero-chips">
+            <span class="chip chip-strong" id="phase-chip">Setup</span>
+            <span class="chip" id="session-chip">Session</span>
+            <span class="chip" id="range-chip">Range</span>
+          </div>
+        </div>
+
+        <div class="hero-metrics">
+          <article class="metric-card">
+            <p class="metric-label">Votes</p>
+            <p class="metric-value" id="metric-votes">0</p>
+            <p class="metric-note">Accepted ballots</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">PVSS / ZKRP</p>
+            <p class="metric-value" id="metric-verified">0</p>
+            <p class="metric-note">Verified voter records</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Talliers</p>
+            <p class="metric-value" id="metric-talliers">0 / 0</p>
+            <p class="metric-note">Decryption quorum</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Tally</p>
+            <p class="metric-value" id="metric-tally">Pending</p>
+            <p class="metric-note">Final aggregation status</p>
+          </article>
+        </div>
+      </header>
+
+      <div id="toast" class="toast" hidden></div>
+
+      <nav class="role-tabs card" aria-label="Protocol roles">
+        <button class="role-tab is-active" data-tab="initiator">Initiator</button>
+        <button class="role-tab" data-tab="voter">Voter</button>
+        <button class="role-tab" data-tab="tallier">Tallier</button>
+      </nav>
+
+      <div class="content-grid">
+        <main class="stage">
+          <section class="tab-panel is-active" id="panel-initiator">
+            <div class="panel-stack">
+              <article class="card panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Bootstrap</p>
+                    <h2>Configure protocol parameters</h2>
+                  </div>
+                  <p class="section-copy">
+                    Regenerate the public parameters, tallier key pairs, candidate count, threshold, and scoring range.
+                  </p>
+                </div>
+
+                <form id="setup-form" class="form-grid">
+                  <label>
+                    <span>Talliers</span>
+                    <input id="setup-talliers" name="numTalliers" type="number" min="2" max="8" required />
+                  </label>
+                  <label>
+                    <span>Candidates</span>
+                    <input id="setup-candidates" name="numCandidates" type="number" min="1" max="6" required />
+                  </label>
+                  <label>
+                    <span>Threshold</span>
+                    <input id="setup-threshold" name="threshold" type="number" min="2" max="8" required />
+                  </label>
+                  <label>
+                    <span>Range Min</span>
+                    <input id="setup-range-min" name="rangeMin" type="number" min="0" required />
+                  </label>
+                  <label>
+                    <span>Range Max</span>
+                    <input id="setup-range-max" name="rangeMax" type="number" min="0" required />
+                  </label>
+                  <div class="form-actions">
+                    <button class="button-primary" type="submit">Rebuild Session</button>
+                  </div>
+                </form>
+              </article>
+
+              <article class="card panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Shared State</p>
+                    <h2>Current public parameters and aggregate state</h2>
+                  </div>
+                  <p class="section-copy">
+                    Inspect compact fingerprints of the current session's public parameters, tallier public keys, and aggregated ciphertext state.
+                  </p>
+                </div>
+
+                <div class="stats-grid" id="param-grid"></div>
+
+                <div class="split-columns">
+                  <div>
+                    <h3 class="subhead">Tallier Public Keys</h3>
+                    <div id="tallier-keys" class="token-list"></div>
+                  </div>
+                  <div>
+                    <h3 class="subhead">Aggregate Commitments</h3>
+                    <div class="aggregate-section">
+                      <p class="aggregate-title">Encrypted shares</p>
+                      <div id="aggregate-c" class="token-list"></div>
+                    </div>
+                    <div class="aggregate-section">
+                      <p class="aggregate-title">Ballot cipher</p>
+                      <div id="aggregate-u" class="token-list"></div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-voter">
+            <div class="panel-stack">
+              <article class="card panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Ballot Composer</p>
+                    <h2>Submit multi-candidate scores</h2>
+                  </div>
+                  <p class="section-copy">
+                    The backend automatically generates each voter's PVSS secret sharing, candidate commitments, and range proofs.
+                  </p>
+                </div>
+
+                <form id="vote-form" class="vote-form">
+                  <label class="alias-field">
+                    <span>Alias</span>
+                    <input id="vote-alias" type="text" maxlength="32" placeholder="For example: Alice / Voter 01" />
+                  </label>
+
+                  <div id="score-grid" class="score-grid"></div>
+
+                  <div class="form-actions">
+                    <button class="button-primary" id="vote-submit" type="submit">Submit Ballot</button>
+                  </div>
+                </form>
+              </article>
+
+              <article class="card panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Verified Ballots</p>
+                    <h2>Recently submitted voter records</h2>
+                  </div>
+                  <p class="section-copy">
+                    Each record shows the submitted scores, PVSS verification result, range-proof verification result, and key ciphertext fingerprints.
+                  </p>
+                </div>
+                <div id="voter-list" class="record-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-tallier">
+            <div class="panel-stack">
+              <article class="card panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Decrypt Shares</p>
+                    <h2>Publish decryption shares one by one</h2>
+                  </div>
+                  <p class="section-copy">
+                    Once the threshold is reached, these verified shares can recover the blinding commitments and reveal the final tally.
+                  </p>
+                </div>
+
+                <div id="tallier-grid" class="tallier-grid"></div>
+
+                <div class="finalize-bar">
+                  <div>
+                    <p class="finalize-label">Threshold Status</p>
+                    <p class="finalize-note" id="finalize-note">Waiting for decryption shares.</p>
+                  </div>
+                  <button class="button-accent" id="finalize-button" type="button">Finalize Tally</button>
+                </div>
+              </article>
+
+              <article class="card panel-card">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Recovered Result</p>
+                    <h2>Final tally result</h2>
+                  </div>
+                  <p class="section-copy">
+                    The recovered result shows each candidate's total score together with a plaintext cross-check from the backend.
+                  </p>
+                </div>
+
+                <div id="tally-board" class="tally-board"></div>
+              </article>
+            </div>
+          </section>
+        </main>
+
+        <aside class="rail">
+          <article class="card rail-card">
+            <div class="panel-head rail-head">
+              <div>
+                <p class="section-kicker">Protocol Feed</p>
+                <h2>Live event feed</h2>
+              </div>
+            </div>
+            <div id="timeline" class="timeline"></div>
+          </article>
+        </aside>
+      </div>
+    </div>
+
+    <script src="/assets/app.js" defer></script>
+  </body>
+  </html>

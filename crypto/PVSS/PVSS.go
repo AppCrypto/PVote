@@ -21,6 +21,7 @@ type Proof struct {
 type SecretSharing struct {
 	BindValue []*big.Int
 	Shares    []*big.Int
+	// V stores h^{p(i)}: tallier evaluations first, then the extra l bind values.
 	V         []*bn256.G1
 	C         []*bn256.G1
 	Proofs    []Proof
@@ -38,6 +39,7 @@ func Setup(numTalliers int, g0 *bn256.G1) ([]*big.Int, []*bn256.G1) {
 }
 
 func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) Proof {
+	// Fiat-Shamir proof that log_G(xG) == log_H(xH) == x.
 	r, _ := rand.Int(rand.Reader, bn256.Order)
 	rG := new(bn256.G1).ScalarMult(G, r)
 	rH := new(bn256.G1).ScalarMult(H, r)
@@ -66,6 +68,8 @@ func DLEQProof(G, H *bn256.G1, xG, xH *bn256.G1, x *big.Int) Proof {
 
 // PVSS.Share: Generate PVSS Shares({Vj},{Cj},DLEQ proofs)
 func Share(secret *big.Int, h *bn256.G1, pks []*bn256.G1, threshold, numTalliers, numCandidates int) *SecretSharing {
+	// The same polynomial is evaluated on positive points for talliers and
+	// negative points for candidate-specific blinding values.
 	coefficients := make([]*big.Int, threshold)
 	coefficients[0] = secret
 	for i := 1; i < threshold; i++ {
@@ -138,6 +142,7 @@ func Coefficient(i int, n int, l int) *big.Int {
 }
 
 func RScodeVerify(shares []*bn256.G1, H1 *bn256.G1, n int, l int) bool {
+	// Check that all published commitments lie on one low-degree polynomial.
 	codeword := make([]*big.Int, n+l)
 	for i := 1; i <= n; i++ {
 		codeword[i-1] = new(big.Int).Mod(Coefficient(i, n, l), bn256.Order)
@@ -155,6 +160,7 @@ func RScodeVerify(shares []*bn256.G1, H1 *bn256.G1, n int, l int) bool {
 
 // PVSS.DVerify
 func DVerify(secretsharing *SecretSharing, h *bn256.G1, pks []*bn256.G1, numTalliers int, numCandidates int) bool {
+	// Verify each encrypted share locally and then check global codeword consistency.
 	for i := 0; i < len(pks); i++ {
 		if !DLEQVerify(secretsharing.Proofs[i].C, secretsharing.Proofs[i].Z, h, pks[i], secretsharing.V[i], secretsharing.C[i], secretsharing.Proofs[i].RG, secretsharing.Proofs[i].RH) {
 			return false
@@ -165,6 +171,7 @@ func DVerify(secretsharing *SecretSharing, h *bn256.G1, pks []*bn256.G1, numTall
 
 // PVSS.Decrypt
 func Decrypt(h *bn256.G1, pk *bn256.G1, c *bn256.G1, sk *big.Int) (*bn256.G1, Proof) {
+	// Recover g^{p(i)} from pk_i^{p(i)} and prove the decryption matches sk_i.
 	skInverse := new(big.Int).ModInverse(sk, bn256.Order)
 	sh := new(bn256.G1).ScalarMult(c, skInverse)
 	proof := DLEQProof(h, sh, pk, c, sk)
@@ -221,6 +228,7 @@ func LagrangeCoefficient(l *big.Int, indices []*big.Int, threshold int) []*big.I
 }
 
 func Reconstruct(coefficient []*big.Int, sh []*bn256.G1) *bn256.G1 {
+	// Rebuild g^{p(l)} in the exponent without revealing the polynomial value.
 	secret := new(bn256.G1).ScalarBaseMult(big.NewInt(0))
 	for i := 0; i < len(coefficient); i++ {
 		secret = new(bn256.G1).Add(secret, new(bn256.G1).ScalarMult(sh[i], coefficient[i]))
