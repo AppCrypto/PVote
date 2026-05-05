@@ -25,15 +25,8 @@ func G1ToG1Point(bn256Point *bn256.G1) contract.VerificationG1Point {
 }
 
 func G1PointToG1(g1point contract.VerificationG1Point) *bn256.G1 {
-	xBytes := g1point.X.Bytes()
-	yBytes := g1point.Y.Bytes()
-
-	if len(xBytes) != 32 {
-		xBytes = append([]byte{0x00}, xBytes...)
-	}
-	if len(yBytes) != 32 {
-		yBytes = append([]byte{0x00}, yBytes...)
-	}
+	xBytes := leftPad32(g1point.X)
+	yBytes := leftPad32(g1point.Y)
 
 	decodedBytes := append(xBytes, yBytes...)
 
@@ -61,22 +54,10 @@ func G2ToG2Point(point *bn256.G2) contract.VerificationG2Point {
 }
 
 func G2PointToG2(g2point contract.VerificationG2Point) *bn256.G2 {
-	x1Bytes := g2point.X[0].Bytes()
-	x2Bytes := g2point.X[1].Bytes()
-	y1Bytes := g2point.Y[0].Bytes()
-	y2Bytes := g2point.Y[1].Bytes()
-	if len(x1Bytes) != 32 {
-		x1Bytes = append([]byte{0x00}, x1Bytes...)
-	}
-	if len(x1Bytes) != 32 {
-		x2Bytes = append([]byte{0x00}, x2Bytes...)
-	}
-	if len(y1Bytes) != 32 {
-		y1Bytes = append([]byte{0x00}, y1Bytes...)
-	}
-	if len(y2Bytes) != 32 {
-		y2Bytes = append([]byte{0x00}, y2Bytes...)
-	}
+	x1Bytes := leftPad32(g2point.X[0])
+	x2Bytes := leftPad32(g2point.X[1])
+	y1Bytes := leftPad32(g2point.Y[0])
+	y2Bytes := leftPad32(g2point.Y[1])
 
 	decodedBytes := append(x1Bytes, x2Bytes...)
 	decodedBytes = append(decodedBytes, y1Bytes...)
@@ -86,6 +67,19 @@ func G2PointToG2(g2point contract.VerificationG2Point) *bn256.G2 {
 	g2.Unmarshal(decodedBytes)
 
 	return g2
+}
+
+func leftPad32(value *big.Int) []byte {
+	if value == nil {
+		return make([]byte, 32)
+	}
+	raw := value.Bytes()
+	if len(raw) >= 32 {
+		return raw[len(raw)-32:]
+	}
+	padded := make([]byte, 32)
+	copy(padded[32-len(raw):], raw)
+	return padded
 }
 
 func GTToString(gt *bn256.GT) string {

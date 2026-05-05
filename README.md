@@ -22,7 +22,7 @@ go install github.com/ethereum/go-ethereum/cmd/abigen@v1.14.3
 - `crypto/ZKRP`: zero-knowledge range proof implementation.
 - `crypto/Convert`: helper conversions for cryptographic data.
 - `utils`: shared utility code.
-- `compile`: legacy Solidity contract source and compilation script.
+- `compile`: Solidity verification contract, ABI/bin artifacts, and generated Go binding for PVSS/ZKRP/PVerifyTally.
 - `web`: Go backend and static frontend for the browser-based PVote demo.
 - `web/static`: HTML, CSS, and JavaScript for the single-page role simulation UI.
 - `web/contract`: stake manager Solidity contract, ABI/bin artifacts, and generated Go binding.
@@ -71,18 +71,27 @@ Open the printed local URL in a browser, usually:
 http://localhost:8080
 ```
 
+At startup, the web backend deploys both the stake manager contract and `compile/contract/Verification.sol` to Ganache, then uploads the paper protocol public parameters and tallier public keys.
+
 The web page provides tabs for:
 
-- Initiator: configure protocol parameters, deploy/fund the Ganache escrow, and inspect shared state.
-- Voter: submit ballots and automatically lock voter stake when Ganache is available.
-- Tallier: lock tallier stake, publish decryption shares, finalize the tally, and withdraw settled rewards.
+- Initiator: configure protocol parameters, deploy/fund Ganache escrow, and inspect public parameters plus on-chain verification status.
+- Voter: submit ballots, lock voter stake, and upload PVSS/ZKRP proofs to `Verification.sol`.
+- Tallier: lock tallier stake, publish decryption shares from the on-chain aggregate, run `PVerifyTally`, and withdraw settled rewards.
 
-## Regenerate Web Contract Bindings
+## Regenerate Contract Bindings
 
 Only run this when `web/contract/StakeManager.sol` changes:
 
 ```bash
 cd web/contract
+bash compile.sh
+```
+
+Only run this when `compile/contract/Verification.sol` changes:
+
+```bash
+cd compile
 bash compile.sh
 ```
 

@@ -265,7 +265,7 @@ code {
 
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
   gap: 1rem;
   margin-top: 0.8rem;
 }
@@ -273,6 +273,11 @@ code {
 .stage,
 .rail {
   min-width: 0;
+}
+
+.rail {
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .tab-panel {
@@ -293,6 +298,8 @@ code {
 .rail-card {
   padding: 1.35rem;
   border-radius: var(--radius-lg);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .panel-head {
@@ -762,12 +769,16 @@ button:disabled {
 .timeline {
   display: grid;
   gap: 0.9rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .timeline-item {
   display: grid;
-  grid-template-columns: 18px 1fr;
+  grid-template-columns: 18px minmax(0, 1fr);
   gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .timeline-dot {
@@ -792,6 +803,27 @@ button:disabled {
 .timeline-copy p {
   margin: 0.35rem 0 0;
   line-height: 1.5;
+}
+
+.timeline-copy {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.timeline-copy .record-head {
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+}
+
+.timeline-copy h3,
+.timeline-copy p,
+.timeline-copy .record-meta {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
 }
 
 .empty-state {

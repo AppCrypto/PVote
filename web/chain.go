@@ -8,28 +8,36 @@ import (
 	"os"
 	"strings"
 
+	verificationcontract "PVote/compile/contract"
+	"PVote/crypto/Convert"
+	"PVote/crypto/PVSS"
+	"PVote/crypto/ZKRP"
 	stakecontract "PVote/web/contract"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/joho/godotenv"
 )
 
 const ganacheURL = "http://127.0.0.1:8545"
 const stakeTxGasLimit uint64 = 8_000_000
+const verificationTxGasLimit uint64 = 30_000_000
 
 type StakeChain struct {
-	URL             string
-	Client          *ethclient.Client
-	Contract        *stakecontract.Stakecontract
-	ContractAddress common.Address
-	Initiator       RoleAccount
-	Talliers        []RoleAccount
-	Voters          []RoleAccount
-	Config          StakeConfig
+	URL                 string
+	Client              *ethclient.Client
+	Contract            *stakecontract.Stakecontract
+	ContractAddress     common.Address
+	Verification        *verificationcontract.Contract
+	VerificationAddress common.Address
+	Initiator           RoleAccount
+	Talliers            []RoleAccount
+	Voters              []RoleAccount
+	Config              StakeConfig
 }
 
 type StakeConfig struct {
@@ -67,7 +75,29 @@ type ChainParticipant struct {
 	Withdrawn     bool
 }
 
-func NewStakeChain(cfg DemoConfig) (*StakeChain, error) {
+type VerificationUploadResult struct {
+	PVSSOK      bool
+	ZKRPOK      bool
+	PVSSTxHash  string
+	ZKRPTxHash  string
+	PVSSGasUsed uint64
+	ZKRPGasUsed uint64
+}
+
+type VerificationTallyResult struct {
+	TxHash  string
+	GasUsed uint64
+	Points  []*bn256.G1
+}
+
+type VerificationOverview struct {
+	ContractAddress string
+	DVerifyCount    int
+	ZKRPVerifyCount int
+	PVerifyCount    int
+}
+
+func NewStakeChain(cfg DemoConfig, pp ZKRP.PP, tallierPKs []*bn256.G1) (*StakeChain, error) {
 	stakeCfg, err := newStakeConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -134,15 +164,263 @@ func NewStakeChain(cfg DemoConfig) (*StakeChain, error) {
 		return nil, fmt.Errorf("wait for stake manager deployment: %w", err)
 	}
 
-	return &StakeChain{
-		URL:             ganacheURL,
-		Client:          client,
-		Contract:        contract,
-		ContractAddress: address,
-		Initiator:       initiator,
-		Talliers:        talliers,
-		Voters:          voters,
-		Config:          stakeCfg,
+	verificationAuth, err := newAuthWithGas(client, initiator.PrivateKey, big.NewInt(0), verificationTxGasLimit)
+	if err != nil {
+		return nil, err
+	}
+	verificationAddress, verificationTx, verificationContract, err := verificationcontract.DeployContract(verificationAuth, client)
+	if err != nil {
+		return nil, fmt.Errorf("deploy verification contract: %w", err)
+	}
+	if _, err := waitForTxReceipt(client, verificationTx); err != nil {
+		return nil, fmt.Errorf("wait for verification deployment: %w", err)
+	}
+
+	chain := &StakeChain{
+		URL:                 ganacheURL,
+		Client:              client,
+		Contract:            contract,
+		ContractAddress:     address,
+		Verification:        verificationContract,
+		VerificationAddress: verificationAddress,
+		Initiator:           initiator,
+		Talliers:            talliers,
+		Voters:              voters,
+		Config:              stakeCfg,
+	}
+
+	if err := chain.UploadVerificationSetup(pp, tallierPKs, cfg); err != nil {
+		return nil, err
+	}
+
+	return chain, nil
+}
+
+func (c *StakeChain) UploadVerificationSetup(pp ZKRP.PP, tallierPKs []*bn256.G1, cfg DemoConfig) error {
+	if c.Verification == nil {
+		return errorsf("verification contract is not available")
+	}
+
+	sigmaK := make([]verificationcontract.VerificationG1Point, len(pp.Sigma_k))
+	for i, sigma := range pp.Sigma_k {
+		sigmaK[i] = Convert.G1ToG1Point(sigma)
+	}
+
+	auth, err := newAuthWithGas(c.Client, c.Initiator.PrivateKey, big.NewInt(0), verificationTxGasLimit)
+	if err != nil {
+		return err
+	}
+	tx, err := c.Verification.UploadParameters(
+		auth,
+		Convert.G1ToG1Point(pp.G0),
+		Convert.G1ToG1Point(pp.H0),
+		Convert.G2ToG2Point(pp.G1),
+		Convert.G2ToG2Point(pp.PKI),
+		sigmaK,
+		big.NewInt(int64(cfg.RangeMin)),
+		big.NewInt(int64(cfg.RangeMax)),
+		big.NewInt(int64(cfg.NumCandidates)),
+		big.NewInt(int64(cfg.NumTalliers)),
+	)
+	if err != nil {
+		return fmt.Errorf("upload verification parameters: %w", err)
+	}
+	if _, err := waitForTxReceipt(c.Client, tx); err != nil {
+		return fmt.Errorf("wait for verification parameters upload: %w", err)
+	}
+
+	pks := make([]verificationcontract.VerificationG1Point, len(tallierPKs))
+	for i, pk := range tallierPKs {
+		pks[i] = Convert.G1ToG1Point(pk)
+	}
+
+	auth, err = newAuthWithGas(c.Client, c.Initiator.PrivateKey, big.NewInt(0), verificationTxGasLimit)
+	if err != nil {
+		return err
+	}
+	tx, err = c.Verification.UploadPublicKey(auth, pks)
+	if err != nil {
+		return fmt.Errorf("upload tallier public keys: %w", err)
+	}
+	if _, err := waitForTxReceipt(c.Client, tx); err != nil {
+		return fmt.Errorf("wait for public key upload: %w", err)
+	}
+	return nil
+}
+
+func (c *StakeChain) UploadVoteProofs(voterID int, share *PVSS.SecretSharing, ballots []*bn256.G1, proofs []*ZKRP.Proof, threshold int) (*VerificationUploadResult, error) {
+	if c.Verification == nil {
+		return nil, errorsf("verification contract is not available")
+	}
+	if voterID < 1 || voterID > len(c.Voters) {
+		return nil, errorsf("no ganache-backed voter account is available for voter %d", voterID)
+	}
+
+	vSet, cSet, a1Set, a2Set, challengeSet, zSet := pvssUploadArgs(share)
+	auth, err := newAuthWithGas(c.Client, c.Voters[voterID-1].PrivateKey, big.NewInt(0), verificationTxGasLimit)
+	if err != nil {
+		return nil, err
+	}
+	pvssTx, err := c.Verification.UploadPVSSShares(auth, vSet, cSet, a1Set, a2Set, challengeSet, zSet)
+	if err != nil {
+		return nil, fmt.Errorf("upload PVSS shares: %w", err)
+	}
+	pvssReceipt, err := waitForTxReceipt(c.Client, pvssTx)
+	if err != nil {
+		return nil, fmt.Errorf("wait for PVSS upload: %w", err)
+	}
+	dVerifyResults, err := c.Verification.GetDVerifyResult(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return nil, fmt.Errorf("read DVerify result: %w", err)
+	}
+
+	result := &VerificationUploadResult{
+		PVSSOK:      lastBool(dVerifyResults),
+		PVSSTxHash:  pvssTx.Hash().Hex(),
+		PVSSGasUsed: pvssReceipt.GasUsed,
+	}
+	if !result.PVSSOK {
+		return result, errorsf("on-chain PVSS.DVerify rejected the voter shares")
+	}
+
+	eSet, f1Set, f2Set, uProofSet, cProofSet, rpChallengeSet, z1Set, z2Set, z3Set, uSet, selectedV := zkrpUploadArgs(share, ballots, proofs)
+	auth, err = newAuthWithGas(c.Client, c.Voters[voterID-1].PrivateKey, big.NewInt(0), verificationTxGasLimit)
+	if err != nil {
+		return result, err
+	}
+	zkrpTx, err := c.Verification.UploadBallotCipher(
+		auth,
+		eSet,
+		f1Set,
+		f2Set,
+		uProofSet,
+		cProofSet,
+		rpChallengeSet,
+		z1Set,
+		z2Set,
+		z3Set,
+		uSet,
+		selectedV,
+		big.NewInt(int64(threshold)),
+	)
+	if err != nil {
+		return result, fmt.Errorf("upload ballot ciphertexts: %w", err)
+	}
+	zkrpReceipt, err := waitForTxReceipt(c.Client, zkrpTx)
+	if err != nil {
+		return result, fmt.Errorf("wait for ballot upload: %w", err)
+	}
+	zkrpResults, err := c.Verification.GetZKRPResult(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return result, fmt.Errorf("read ZKRP result: %w", err)
+	}
+	result.ZKRPOK = lastBool(zkrpResults)
+	result.ZKRPTxHash = zkrpTx.Hash().Hex()
+	result.ZKRPGasUsed = zkrpReceipt.GasUsed
+	if !result.ZKRPOK {
+		return result, errorsf("on-chain ZKRP.Verify rejected the ballot ciphertexts")
+	}
+
+	return result, nil
+}
+
+func (c *StakeChain) ReadAggregatedC() ([]*bn256.G1, error) {
+	if c.Verification == nil {
+		return nil, errorsf("verification contract is not available")
+	}
+	points, err := c.Verification.GetAggregateValue(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*bn256.G1, len(points))
+	for i, point := range points {
+		result[i] = Convert.G1PointToG1(point)
+	}
+	return result, nil
+}
+
+func (c *StakeChain) VerifyTallierSharesAndTally(records []*TallierRecord, threshold int, numCandidates int) (*VerificationTallyResult, error) {
+	if c.Verification == nil {
+		return nil, errorsf("verification contract is not available")
+	}
+	if len(records) < threshold {
+		return nil, errorsf("need %d tallier shares, got %d", threshold, len(records))
+	}
+
+	indexSet := make([]*big.Int, threshold)
+	decShareSet := make([]verificationcontract.VerificationG1Point, threshold)
+	a1Set := make([]verificationcontract.VerificationG1Point, threshold)
+	a2Set := make([]verificationcontract.VerificationG1Point, threshold)
+	challengeSet := make([]*big.Int, threshold)
+	zSet := make([]*big.Int, threshold)
+	for i, rec := range records[:threshold] {
+		indexSet[i] = big.NewInt(int64(rec.ID))
+		decShareSet[i] = Convert.G1ToG1Point(rec.Share)
+		a1Set[i] = Convert.G1ToG1Point(rec.Proof.RG)
+		a2Set[i] = Convert.G1ToG1Point(rec.Proof.RH)
+		challengeSet[i] = rec.Proof.C
+		zSet[i] = rec.Proof.Z
+	}
+
+	auth, err := newAuthWithGas(c.Client, c.Initiator.PrivateKey, big.NewInt(0), verificationTxGasLimit)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := c.Verification.PVerifyTally(
+		auth,
+		indexSet,
+		decShareSet,
+		a1Set,
+		a2Set,
+		challengeSet,
+		zSet,
+		big.NewInt(int64(threshold)),
+		big.NewInt(int64(numCandidates)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("verify tallier shares and tally on-chain: %w", err)
+	}
+	receipt, err := waitForTxReceipt(c.Client, tx)
+	if err != nil {
+		return nil, fmt.Errorf("wait for PVerifyTally: %w", err)
+	}
+
+	tallyPoints, err := c.Verification.GetTallyValue(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return nil, fmt.Errorf("read on-chain tally value: %w", err)
+	}
+	points := make([]*bn256.G1, len(tallyPoints))
+	for i, point := range tallyPoints {
+		points[i] = Convert.G1PointToG1(point)
+	}
+	return &VerificationTallyResult{
+		TxHash:  tx.Hash().Hex(),
+		GasUsed: receipt.GasUsed,
+		Points:  points,
+	}, nil
+}
+
+func (c *StakeChain) ReadVerificationOverview() (*VerificationOverview, error) {
+	if c.Verification == nil {
+		return nil, errorsf("verification contract is not available")
+	}
+	dVerify, err := c.Verification.GetDVerifyResult(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return nil, err
+	}
+	zkrp, err := c.Verification.GetZKRPResult(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return nil, err
+	}
+	pVerify, err := c.Verification.GetPVerifyResult(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return nil, err
+	}
+	return &VerificationOverview{
+		ContractAddress: c.VerificationAddress.Hex(),
+		DVerifyCount:    len(dVerify),
+		ZKRPVerifyCount: logicalZKRPUploadCount(zkrp),
+		PVerifyCount:    len(pVerify),
 	}, nil
 }
 
@@ -350,6 +628,90 @@ func (c *StakeChain) ReadTallier(tallierID int) (*ChainParticipant, error) {
 	}, nil
 }
 
+func pvssUploadArgs(share *PVSS.SecretSharing) (
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+	[]*big.Int,
+	[]*big.Int,
+) {
+	vSet := make([]verificationcontract.VerificationG1Point, len(share.V))
+	for i, value := range share.V {
+		vSet[i] = Convert.G1ToG1Point(value)
+	}
+
+	cSet := make([]verificationcontract.VerificationG1Point, len(share.C))
+	a1Set := make([]verificationcontract.VerificationG1Point, len(share.Proofs))
+	a2Set := make([]verificationcontract.VerificationG1Point, len(share.Proofs))
+	challengeSet := make([]*big.Int, len(share.Proofs))
+	zSet := make([]*big.Int, len(share.Proofs))
+	for i := range share.Proofs {
+		cSet[i] = Convert.G1ToG1Point(share.C[i])
+		a1Set[i] = Convert.G1ToG1Point(share.Proofs[i].RG)
+		a2Set[i] = Convert.G1ToG1Point(share.Proofs[i].RH)
+		challengeSet[i] = share.Proofs[i].C
+		zSet[i] = share.Proofs[i].Z
+	}
+	return vSet, cSet, a1Set, a2Set, challengeSet, zSet
+}
+
+func zkrpUploadArgs(share *PVSS.SecretSharing, ballots []*bn256.G1, proofs []*ZKRP.Proof) (
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+	[]*big.Int,
+	[]*big.Int,
+	[]*big.Int,
+	[]*big.Int,
+	[]verificationcontract.VerificationG1Point,
+	[]verificationcontract.VerificationG1Point,
+) {
+	numTalliers := len(share.C)
+	numCandidates := len(proofs)
+	eSet := make([]verificationcontract.VerificationG1Point, numCandidates)
+	f1Set := make([]verificationcontract.VerificationG1Point, numCandidates)
+	f2Set := make([]verificationcontract.VerificationG1Point, numCandidates)
+	uProofSet := make([]verificationcontract.VerificationG1Point, numCandidates)
+	cProofSet := make([]verificationcontract.VerificationG1Point, numCandidates)
+	rpChallengeSet := make([]*big.Int, numCandidates)
+	z1Set := make([]*big.Int, numCandidates)
+	z2Set := make([]*big.Int, numCandidates)
+	z3Set := make([]*big.Int, numCandidates)
+	uSet := make([]verificationcontract.VerificationG1Point, numCandidates)
+	selectedV := make([]verificationcontract.VerificationG1Point, numCandidates)
+
+	for i, proof := range proofs {
+		eSet[i] = Convert.G1ToG1Point(proof.Ej)
+		f1Set[i] = Convert.G1ToG1Point(proof.Fj1)
+		f2Set[i] = Convert.G1ToG1Point(proof.Fj2)
+		uProofSet[i] = Convert.G1ToG1Point(proof.Uj)
+		cProofSet[i] = Convert.G1ToG1Point(proof.Cj)
+		rpChallengeSet[i] = proof.C
+		z1Set[i] = proof.Z1
+		z2Set[i] = proof.Z2
+		z3Set[i] = proof.Z3
+		uSet[i] = Convert.G1ToG1Point(ballots[i])
+		selectedV[i] = Convert.G1ToG1Point(share.V[numTalliers+i])
+	}
+
+	return eSet, f1Set, f2Set, uProofSet, cProofSet, rpChallengeSet, z1Set, z2Set, z3Set, uSet, selectedV
+}
+
+func lastBool(values []bool) bool {
+	return len(values) > 0 && values[len(values)-1]
+}
+
+func logicalZKRPUploadCount(values []bool) int {
+	if len(values) == 0 {
+		return 0
+	}
+	// Verification.sol records one result inside ZKRPVerify and another in UploadBallotCipher.
+	return (len(values) + 1) / 2
+}
+
 func newStakeConfig(cfg DemoConfig) (StakeConfig, error) {
 	initiatorEscrow, err := parseETHToWei(cfg.InitiatorEscrowETH)
 	if err != nil {
@@ -428,6 +790,10 @@ func newRoleAccount(privateKeyHex string) (RoleAccount, error) {
 }
 
 func newAuth(client *ethclient.Client, privateKeyHex string, value *big.Int) (*bind.TransactOpts, error) {
+	return newAuthWithGas(client, privateKeyHex, value, stakeTxGasLimit)
+}
+
+func newAuthWithGas(client *ethclient.Client, privateKeyHex string, value *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
 	key, err := crypto.HexToECDSA(strings.TrimSpace(privateKeyHex))
 	if err != nil {
 		return nil, err
@@ -457,14 +823,14 @@ func newAuth(client *ethclient.Client, privateKeyHex string, value *big.Int) (*b
 	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = value
-	auth.GasLimit = stakeTxGasLimit
+	auth.GasLimit = gasLimit
 	auth.GasPrice = gasPrice
 
 	balance, err := client.BalanceAt(context.Background(), fromAddress, nil)
 	if err != nil {
 		return nil, err
 	}
-	requiredGas := new(big.Int).Mul(new(big.Int).SetUint64(stakeTxGasLimit), gasPrice)
+	requiredGas := new(big.Int).Mul(new(big.Int).SetUint64(gasLimit), gasPrice)
 	required := new(big.Int).Add(requiredGas, value)
 	if balance.Cmp(required) < 0 {
 		return nil, fmt.Errorf(
@@ -478,14 +844,19 @@ func newAuth(client *ethclient.Client, privateKeyHex string, value *big.Int) (*b
 }
 
 func waitForTx(client *ethclient.Client, tx *types.Transaction) error {
+	_, err := waitForTxReceipt(client, tx)
+	return err
+}
+
+func waitForTxReceipt(client *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
 	receipt, err := bind.WaitMined(context.Background(), client, tx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if receipt.Status != types.ReceiptStatusSuccessful {
-		return errorsf("transaction %s reverted", tx.Hash().Hex())
+		return nil, errorsf("transaction %s reverted", tx.Hash().Hex())
 	}
-	return nil
+	return receipt, nil
 }
 
 func intSliceToBigInts(values []int) []*big.Int {

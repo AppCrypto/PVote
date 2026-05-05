@@ -233,7 +233,9 @@ function renderParams() {
 
   document.getElementById("chain-overview").innerHTML = [
     ledgerCard("Ganache", chain.available ? "Connected" : "Unavailable", chain.rpcUrl, chain.available ? statusBadge("Live", "ok") : statusBadge("Offline", "warn")),
-    ledgerCard("Contract", chain.contractAddress ? shortAddress(chain.contractAddress) : "Not deployed", chain.contractAddress || "Start Ganache with the README mnemonic, then rebuild the session."),
+    ledgerCard("Stake Manager", chain.contractAddress ? shortAddress(chain.contractAddress) : "Not deployed", chain.contractAddress || "Start Ganache with the README mnemonic, then rebuild the session."),
+    ledgerCard("Verification.sol", chain.verificationAddress ? shortAddress(chain.verificationAddress) : "Not deployed", chain.verificationStatus || "PVSS, ZKRP, and PVerifyTally contract state."),
+    ledgerCard("On-chain Uploads", `${chain.dVerifyCount} PVSS / ${chain.zkrpVerifyCount} ZKRP`, chain.pVerifyCount ? `${chain.pVerifyCount} tallier shares finalized by PVerifyTally.` : "PVerifyTally runs when the threshold tally is finalized."),
     ledgerCard("Escrow Balance", formatETH(chain.contractBalanceEth), `${formatETH(chain.totalEscrowEth)} total deposited`, escrowBadge),
     ledgerCard("Reward Pool", formatETH(chain.rewardPoolEth), chain.rewardSplit, rewardBadge),
     financeCard("Initiator", chain.initiator, chain.initiatorEscrowEth, "Reward escrow"),
@@ -300,6 +302,8 @@ function renderVoters() {
     .slice()
     .reverse()
     .map((voter) => {
+      const pvssLabel = voter.pvssOnChain ? "PVSS Chain OK" : voter.pvssVerified ? "PVSS Go OK" : "PVSS FAIL";
+      const zkrpLabel = voter.rangeOnChain ? "ZKRP Chain OK" : voter.rangeVerified ? "ZKRP Go OK" : "ZKRP FAIL";
       const withdrawLabel = voter.stake.withdrawn
         ? "Withdrawn"
         : voter.stake.canWithdraw
@@ -319,8 +323,8 @@ function renderVoters() {
               <p class="record-meta">#${voter.id} · ${voter.submittedAt}</p>
             </div>
             <div class="badge-row">
-              <span class="badge ${voter.pvssVerified ? "badge-ok" : "badge-warn"}">PVSS ${voter.pvssVerified ? "OK" : "FAIL"}</span>
-              <span class="badge ${voter.rangeVerified ? "badge-ok" : "badge-warn"}">ZKRP ${voter.rangeVerified ? "OK" : "FAIL"}</span>
+              <span class="badge ${voter.pvssVerified ? "badge-ok" : "badge-warn"}">${pvssLabel}</span>
+              <span class="badge ${voter.rangeVerified ? "badge-ok" : "badge-warn"}">${zkrpLabel}</span>
               ${participantStatusBadge(voter.stake, chain.available ? "No Stake" : "Off-chain")}
             </div>
           </div>
@@ -334,6 +338,8 @@ function renderVoters() {
               ${financeBadge("Deposited", voter.stake.depositedEth)}
               ${financeBadge("Claimable", voter.stake.claimableEth)}
               ${financeBadge("Wallet", voter.stake.walletBalanceEth)}
+              ${voter.pvssGasUsed ? gasBadge("PVSS Gas", voter.pvssGasUsed) : ""}
+              ${voter.zkrpGasUsed ? gasBadge("ZKRP Gas", voter.zkrpGasUsed) : ""}
             </div>
             <p class="record-meta account-line" title="${escapeHTML(voter.stake.address || "")}">${escapeHTML(accountLabel)}</p>
           </div>
@@ -460,6 +466,7 @@ function renderTally() {
   board.innerHTML = `
     <div class="badge-row">
       <span class="badge ${tally.verified ? "badge-ok" : "badge-warn"}">${tally.verified ? "Cross-check passed" : "Cross-check mismatch"}</span>
+      <span class="badge ${tally.onChainVerified ? "badge-ok" : "badge-neutral"}">${tally.onChainVerified ? "Verification.sol tally" : "Go fallback tally"}</span>
       <span class="badge ${chain.settled ? "badge-ok" : "badge-neutral"}">${chain.settled ? "Ganache settled" : "Ganache pending"}</span>
       <span class="record-meta">Finalized at ${tally.finalizedAt}</span>
     </div>
@@ -468,6 +475,7 @@ function renderTally() {
       ${rewardCard("Initiator Claimable", formatETH(chain.initiator.claimableEth), chain.initiator.withdrawn ? "Already withdrawn" : `Account ${shortAddress(chain.initiator.address)}`)}
       ${rewardCard("Voter Rewards", `${rewardedVoters} honest voters`, "Claimable balances are shown on each voter record.")}
       ${rewardCard("Tallier Rewards", `${rewardedTalliers} honest talliers`, "Claimable balances are shown on each tallier card.")}
+      ${rewardCard("PVerifyTally", tally.onChainVerified ? "On-chain" : "Local fallback", tally.verificationGas ? `Gas ${tally.verificationGas} · ${shortAddress(tally.verificationTx)}` : "No Verification.sol transaction.")}
     </div>
     <div class="result-list">
       ${tally.results
@@ -606,6 +614,10 @@ function amountCell(label, value) {
 
 function financeBadge(label, value) {
   return `<span class="token token-soft finance-token">${escapeHTML(label)} · ${escapeHTML(formatETH(value))}</span>`;
+}
+
+function gasBadge(label, value) {
+  return `<span class="token token-soft finance-token">${escapeHTML(label)} · ${escapeHTML(String(value))}</span>`;
 }
 
 function statusBadge(label, tone = "neutral") {
