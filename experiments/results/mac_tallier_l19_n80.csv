@@ -1,0 +1,2 @@
+n,l,t,runs,setup_runs,go_version,goos,goarch,setup_mean_ms,setup_std_ms,share_mean_ms,share_std_ms,dverify_mean_ms,dverify_std_ms,transcript_kib,decrypt_mean_ms,decrypt_std_ms,pverify_mean_ms,pverify_std_ms,recon_mean_ms,recon_std_ms
+80,19,49,20,5,go1.25.4,darwin,amd64,28.025667,0.416958,76.410792,1.910748,227.641906,5.401859,32.031250,6.061460,0.278461,6.156473,0.409026,189.254504,5.247631

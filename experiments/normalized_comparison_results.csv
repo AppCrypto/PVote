@@ -1,0 +1,18 @@
+experiment,x,n,l,t,budget_B,batch_m,pvote_normalized_ms,priscore_normalized_ms,calibration_runs,go_version,goos,goarch,a0_mean_ns,e0_mean_ns,e1_mean_ns,pair_mean_ns,note
+vote_vs_score_parameter,1,40,10,25,1,1,29.724225,22.645222,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized; PriScore uses B=x and PVote uses range width b-a=x
+verify_per_ballot_vs_score_parameter,1,40,10,25,1,1000,67.692735,12.837100,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized per ballot
+vote_vs_score_parameter,3,40,10,25,3,1,29.724225,42.838413,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized; PriScore uses B=x and PVote uses range width b-a=x
+verify_per_ballot_vs_score_parameter,3,40,10,25,3,1000,67.692735,37.357404,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized per ballot
+vote_vs_score_parameter,5,40,10,25,5,1,29.724225,63.031604,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized; PriScore uses B=x and PVote uses range width b-a=x
+verify_per_ballot_vs_score_parameter,5,40,10,25,5,1000,67.692735,61.877707,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized per ballot
+vote_vs_score_parameter,10,40,10,25,10,1,29.724225,113.514582,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized; PriScore uses B=x and PVote uses range width b-a=x
+verify_per_ballot_vs_score_parameter,10,40,10,25,10,1000,67.692735,123.178466,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized per ballot
+vote_vs_score_parameter,20,40,10,25,20,1,29.724225,214.480538,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized; PriScore uses B=x and PVote uses range width b-a=x
+verify_per_ballot_vs_score_parameter,20,40,10,25,20,1000,67.692735,245.779984,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized per ballot
+vote_vs_score_parameter,50,40,10,25,50,1,29.724225,517.378406,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized; PriScore uses B=x and PVote uses range width b-a=x
+verify_per_ballot_vs_score_parameter,50,40,10,25,50,1000,67.692735,613.584538,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized per ballot
+post_deadline_group_work_vs_voters,100,40,10,25,0,100,30.650379,0.000000,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized group work
+post_deadline_group_work_vs_voters,1000,40,10,25,0,1000,30.650379,0.000000,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized group work
+post_deadline_group_work_vs_voters,10000,40,10,25,0,10000,30.650379,0.000000,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized group work
+post_deadline_group_work_vs_voters,100000,40,10,25,0,100000,30.650379,0.000000,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,operation-normalized group work
+streaming_aggregation_per_ballot,50,40,10,25,0,1,0.021458,0.000000,200,go1.25.4,darwin,amd64,429.170000,72118.540000,342721.250000,1169458.960000,PVote incremental aggregate update; baselines defer aggregation

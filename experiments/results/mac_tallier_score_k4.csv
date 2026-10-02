@@ -1,0 +1,10 @@
+experiment,x,scheme,phase,mean_ms,runs,n,l,t,budget_B,voters_m,go_version,goos,goarch,note
+score_domain_generation,4,PVote,Share,14.330783,5,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_generation,4,PriScore,Commit+Vote,230.604508,5,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_generation,4,3PVSS-bit,kappa Share,23.709617,5,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_verification,4,PVote,DVerify,47.208550,5,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_verification,4,PriScore,VerifyVote,236.144117,5,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_verification,4,3PVSS-bit,kappa Verify,30.673142,5,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_ballot_kib,4,PVote,serialized ballot,5.343750,1,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_ballot_kib,4,PriScore,serialized commit+ballot,19.093750,1,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances
+score_domain_ballot_kib,4,3PVSS-bit,paper-accounted ballot,12.250000,1,10,5,7,15,1,go1.25.4,darwin,amd64,one BN254 backend; B=2^kappa-1; PriScore ballots satisfy sum scores=B; 3PVSS-bit runs kappa native binary instances

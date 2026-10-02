@@ -20,7 +20,9 @@ function bindTabs() {
 }
 
 function bindForms() {
-  document.getElementById("setup-form").addEventListener("submit", async (event) => {
+	document.getElementById("setup-talliers").addEventListener("input", syncPaperParameters);
+	document.getElementById("setup-candidates").addEventListener("input", syncPaperParameters);
+	document.getElementById("setup-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const payload = {
       numTalliers: Number(document.getElementById("setup-talliers").value),
@@ -47,6 +49,19 @@ function bindForms() {
     await postJSON("/api/voters", { alias, scores });
     document.getElementById("vote-alias").value = "";
   });
+}
+
+function syncPaperParameters() {
+	const talliers = Number(document.getElementById("setup-talliers").value);
+	const candidatesInput = document.getElementById("setup-candidates");
+	if (!Number.isInteger(talliers) || talliers < 3) return;
+	const maxCandidates = Math.max(1, Math.floor(talliers / 3));
+	candidatesInput.max = String(maxCandidates);
+	if (Number(candidatesInput.value) > maxCandidates) candidatesInput.value = String(maxCandidates);
+	const candidates = Number(candidatesInput.value);
+	if (Number.isInteger(candidates) && candidates > 0) {
+		document.getElementById("setup-threshold").value = String(Math.floor((talliers + candidates) / 2));
+	}
 }
 
 function bindActions() {
@@ -160,6 +175,7 @@ function renderSetupForm() {
   document.getElementById("setup-talliers").value = config.numTalliers;
   document.getElementById("setup-candidates").value = config.numCandidates;
   document.getElementById("setup-threshold").value = config.threshold;
+	syncPaperParameters();
   document.getElementById("setup-range-min").value = config.rangeMin;
   document.getElementById("setup-range-max").value = config.rangeMax;
   document.getElementById("setup-initiator-escrow").value = config.initiatorEscrowEth;
@@ -233,9 +249,9 @@ function renderParams() {
 
   document.getElementById("chain-overview").innerHTML = [
     ledgerCard("Ganache", chain.available ? "Connected" : "Unavailable", chain.rpcUrl, chain.available ? statusBadge("Live", "ok") : statusBadge("Offline", "warn")),
+    ledgerCard("RB-PVSS Verifier", chain.verifierAddress ? shortAddress(chain.verifierAddress) : "Not deployed", chain.verifierAddress || "Start Ganache with the README mnemonic, then rebuild the session."),
     ledgerCard("Stake Manager", chain.contractAddress ? shortAddress(chain.contractAddress) : "Not deployed", chain.contractAddress || "Start Ganache with the README mnemonic, then rebuild the session."),
-    ledgerCard("Verification.sol", chain.verificationAddress ? shortAddress(chain.verificationAddress) : "Not deployed", chain.verificationStatus || "PVSS, ZKRP, and PVerifyTally contract state."),
-    ledgerCard("On-chain Uploads", `${chain.dVerifyCount} PVSS / ${chain.zkrpVerifyCount} ZKRP`, chain.pVerifyCount ? `${chain.pVerifyCount} tallier shares finalized by PVerifyTally.` : "PVerifyTally runs when the threshold tally is finalized."),
+	ledgerCard("RB-PVSS", "Canonical Go verifier", "DVerify and PVerify validate complete paper transcripts before aggregation or reconstruction.", statusBadge("Exact", "ok")),
     ledgerCard("Escrow Balance", formatETH(chain.contractBalanceEth), `${formatETH(chain.totalEscrowEth)} total deposited`, escrowBadge),
     ledgerCard("Reward Pool", formatETH(chain.rewardPoolEth), chain.rewardSplit, rewardBadge),
     financeCard("Initiator", chain.initiator, chain.initiatorEscrowEth, "Reward escrow"),
@@ -302,8 +318,8 @@ function renderVoters() {
     .slice()
     .reverse()
     .map((voter) => {
-      const pvssLabel = voter.pvssOnChain ? "PVSS Chain OK" : voter.pvssVerified ? "PVSS Go OK" : "PVSS FAIL";
-      const zkrpLabel = voter.rangeOnChain ? "ZKRP Chain OK" : voter.rangeVerified ? "ZKRP Go OK" : "ZKRP FAIL";
+	  const pvssLabel = voter.pvssVerified ? "PVSS OK" : "PVSS FAIL";
+	  const zkrpLabel = voter.rangeVerified ? "Range binding OK" : "Range binding FAIL";
       const withdrawLabel = voter.stake.withdrawn
         ? "Withdrawn"
         : voter.stake.canWithdraw
@@ -338,8 +354,6 @@ function renderVoters() {
               ${financeBadge("Deposited", voter.stake.depositedEth)}
               ${financeBadge("Claimable", voter.stake.claimableEth)}
               ${financeBadge("Wallet", voter.stake.walletBalanceEth)}
-              ${voter.pvssGasUsed ? gasBadge("PVSS Gas", voter.pvssGasUsed) : ""}
-              ${voter.zkrpGasUsed ? gasBadge("ZKRP Gas", voter.zkrpGasUsed) : ""}
             </div>
             <p class="record-meta account-line" title="${escapeHTML(voter.stake.address || "")}">${escapeHTML(accountLabel)}</p>
           </div>
@@ -466,7 +480,7 @@ function renderTally() {
   board.innerHTML = `
     <div class="badge-row">
       <span class="badge ${tally.verified ? "badge-ok" : "badge-warn"}">${tally.verified ? "Cross-check passed" : "Cross-check mismatch"}</span>
-      <span class="badge ${tally.onChainVerified ? "badge-ok" : "badge-neutral"}">${tally.onChainVerified ? "Verification.sol tally" : "Go fallback tally"}</span>
+	  <span class="badge badge-ok">RB-PVSS.Recon</span>
       <span class="badge ${chain.settled ? "badge-ok" : "badge-neutral"}">${chain.settled ? "Ganache settled" : "Ganache pending"}</span>
       <span class="record-meta">Finalized at ${tally.finalizedAt}</span>
     </div>
@@ -475,7 +489,7 @@ function renderTally() {
       ${rewardCard("Initiator Claimable", formatETH(chain.initiator.claimableEth), chain.initiator.withdrawn ? "Already withdrawn" : `Account ${shortAddress(chain.initiator.address)}`)}
       ${rewardCard("Voter Rewards", `${rewardedVoters} honest voters`, "Claimable balances are shown on each voter record.")}
       ${rewardCard("Tallier Rewards", `${rewardedTalliers} honest talliers`, "Claimable balances are shown on each tallier card.")}
-      ${rewardCard("PVerifyTally", tally.onChainVerified ? "On-chain" : "Local fallback", tally.verificationGas ? `Gas ${tally.verificationGas} · ${shortAddress(tally.verificationTx)}` : "No Verification.sol transaction.")}
+	  ${rewardCard("Cryptographic tally", "RB-PVSS.Recon", "Settlement is separate from cryptographic verification.")}
     </div>
     <div class="result-list">
       ${tally.results

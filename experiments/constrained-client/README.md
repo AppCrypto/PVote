@@ -1,0 +1,5 @@
+# C1M1 resource-constrained client profile
+
+Run scripts/run_constrained_client_bench.sh on a Linux/ARM64 Docker runtime. The C1M1 profile limits the voter container to one CPU, 1 GiB of memory, 256 processes, and 1024 open files. It applies a 5 Mbit/s egress rate, 40 ms one-way delay, and 10 ms delay jitter with tc netem; the receiver applies the corresponding return-path delay. The script writes the complete cryptographic measurements to experiments/results/constrained_client_rbpvss_results.csv, the 20 upload samples to experiments/results/constrained_client_upload_samples_ms.txt, and the summarized \((n,l,t)=(100,19,59)\) result to experiments/results/constrained_client_c1m1.csv.
+
+The profile reports the Share mean as constrained-client voter-side transcript-generation time and posts a payload equal to the implementation's fixed-width ballot encoding. It is an emulation of a bounded client runtime; it is not a physical-phone experiment and must not be used for handset latency, energy, radio, or usability claims.

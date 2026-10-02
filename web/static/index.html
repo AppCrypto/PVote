@@ -31,7 +31,7 @@
             <p class="metric-note">Accepted ballots</p>
           </article>
           <article class="metric-card">
-            <p class="metric-label">PVSS / ZKRP</p>
+			<p class="metric-label">RB-PVSS</p>
             <p class="metric-value" id="metric-verified">0</p>
             <p class="metric-note">Verified voter records</p>
           </article>
@@ -74,7 +74,7 @@
                 <form id="setup-form" class="form-grid">
                   <label>
                     <span>Talliers</span>
-                    <input id="setup-talliers" name="numTalliers" type="number" min="2" max="8" required />
+					<input id="setup-talliers" name="numTalliers" type="number" min="3" max="8" required />
                   </label>
                   <label>
                     <span>Candidates</span>
@@ -82,11 +82,11 @@
                   </label>
                   <label>
                     <span>Threshold</span>
-                    <input id="setup-threshold" name="threshold" type="number" min="2" max="8" required />
+					<input id="setup-threshold" name="threshold" type="number" min="2" max="8" readonly required />
                   </label>
                   <label>
                     <span>Range Min</span>
-                    <input id="setup-range-min" name="rangeMin" type="number" min="0" required />
+					<input id="setup-range-min" name="rangeMin" type="number" required />
                   </label>
                   <label>
                     <span>Range Max</span>
@@ -207,7 +207,7 @@
                     <h2>Recently submitted voter records</h2>
                   </div>
                   <p class="section-copy">
-                    Each record shows the submitted scores, PVSS verification result, range-proof verification result, and key ciphertext fingerprints.
+					Each record shows the submitted scores, atomic RB-PVSS verification result, and key transcript fingerprints.
                   </p>
                 </div>
                 <div id="voter-list" class="record-list"></div>

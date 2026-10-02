@@ -1,8 +1,7 @@
 package main
 
 import (
-	"PVote/crypto/PVSS"
-	"PVote/crypto/ZKRP"
+	rbpvss "PVote/crypto/RBPVSS"
 	"crypto/rand"
 	"crypto/sha256"
 	"embed"
@@ -51,11 +50,10 @@ type DemoConfig struct {
 type DemoState struct {
 	Config      DemoConfig
 	SessionID   string
-	PP          ZKRP.PP
+	PP          *rbpvss.PublicParameters
 	TallierSKs  []*big.Int
 	TallierPKs  []*bn256.G1
-	AggregateC  []*bn256.G1
-	AggregateU  []*bn256.G1
+	Aggregate   *rbpvss.Aggregate
 	Votes       []*VoterRecord
 	Decryptions map[int]*TallierRecord
 	Tally       *TallyRecord
@@ -69,36 +67,25 @@ type VoterRecord struct {
 	ID            int
 	Alias         string
 	Scores        []int
-	Share         *PVSS.SecretSharing
-	Ballots       []*bn256.G1
-	Proofs        []*ZKRP.Proof
+	Instance      *rbpvss.Instance
 	PVSSVerified  bool
 	RangeVerified bool
-	PVSSOnChain   bool
-	RangeOnChain  bool
-	PVSSTxHash    string
-	ZKRPTxHash    string
-	PVSSGasUsed   uint64
-	ZKRPGasUsed   uint64
 	SubmittedAt   time.Time
 }
 
 type TallierRecord struct {
 	ID          int
 	Share       *bn256.G1
-	Proof       PVSS.Proof
+	Proof       *rbpvss.DecryptionProof
 	Verified    bool
 	DecryptedAt time.Time
 }
 
 type TallyRecord struct {
-	Results         []int
-	Points          []*bn256.G1
-	Verified        bool
-	OnChainVerified bool
-	VerificationTx  string
-	VerificationGas uint64
-	FinalizedAt     time.Time
+	Results     []int
+	Points      []*bn256.G1
+	Verified    bool
+	FinalizedAt time.Time
 }
 
 type EventRecord struct {
@@ -196,10 +183,6 @@ type VoterSnapshot struct {
 	Scores          []int           `json:"scores"`
 	PVSSVerified    bool            `json:"pvssVerified"`
 	RangeVerified   bool            `json:"rangeVerified"`
-	PVSSOnChain     bool            `json:"pvssOnChain"`
-	RangeOnChain    bool            `json:"rangeOnChain"`
-	PVSSGasUsed     uint64          `json:"pvssGasUsed"`
-	ZKRPGasUsed     uint64          `json:"zkrpGasUsed"`
 	SubmittedAt     string          `json:"submittedAt"`
 	BindCommitments []string        `json:"bindCommitments"`
 	EncryptedShares []string        `json:"encryptedShares"`
@@ -219,12 +202,9 @@ type TallierSnapshot struct {
 }
 
 type TallySnapshot struct {
-	FinalizedAt     string                    `json:"finalizedAt"`
-	Verified        bool                      `json:"verified"`
-	OnChainVerified bool                      `json:"onChainVerified"`
-	VerificationTx  string                    `json:"verificationTx"`
-	VerificationGas uint64                    `json:"verificationGas"`
-	Results         []CandidateResultSnapshot `json:"results"`
+	FinalizedAt string                    `json:"finalizedAt"`
+	Verified    bool                      `json:"verified"`
+	Results     []CandidateResultSnapshot `json:"results"`
 }
 
 type CandidateResultSnapshot struct {
@@ -242,26 +222,22 @@ type EventSnapshot struct {
 }
 
 type ChainSnapshot struct {
-	Available           bool            `json:"available"`
-	Status              string          `json:"status"`
-	RPCURL              string          `json:"rpcUrl"`
-	ContractAddress     string          `json:"contractAddress"`
-	VerificationAddress string          `json:"verificationAddress"`
-	VerificationStatus  string          `json:"verificationStatus"`
-	DVerifyCount        int             `json:"dVerifyCount"`
-	ZKRPVerifyCount     int             `json:"zkrpVerifyCount"`
-	PVerifyCount        int             `json:"pVerifyCount"`
-	EscrowFunded        bool            `json:"escrowFunded"`
-	Settled             bool            `json:"settled"`
-	InitiatorEscrowEth  string          `json:"initiatorEscrowEth"`
-	VoterStakeEth       string          `json:"voterStakeEth"`
-	TallierStakeEth     string          `json:"tallierStakeEth"`
-	RewardSplit         string          `json:"rewardSplit"`
-	TotalEscrowEth      string          `json:"totalEscrowEth"`
-	RewardPoolEth       string          `json:"rewardPoolEth"`
-	ContractBalanceEth  string          `json:"contractBalanceEth"`
-	MaxVoters           int             `json:"maxVoters"`
-	Initiator           FinanceSnapshot `json:"initiator"`
+	Available          bool            `json:"available"`
+	Status             string          `json:"status"`
+	RPCURL             string          `json:"rpcUrl"`
+	ContractAddress    string          `json:"contractAddress"`
+	VerifierAddress    string          `json:"verifierAddress"`
+	EscrowFunded       bool            `json:"escrowFunded"`
+	Settled            bool            `json:"settled"`
+	InitiatorEscrowEth string          `json:"initiatorEscrowEth"`
+	VoterStakeEth      string          `json:"voterStakeEth"`
+	TallierStakeEth    string          `json:"tallierStakeEth"`
+	RewardSplit        string          `json:"rewardSplit"`
+	TotalEscrowEth     string          `json:"totalEscrowEth"`
+	RewardPoolEth      string          `json:"rewardPoolEth"`
+	ContractBalanceEth string          `json:"contractBalanceEth"`
+	MaxVoters          int             `json:"maxVoters"`
+	Initiator          FinanceSnapshot `json:"initiator"`
 }
 
 type FinanceSnapshot struct {
@@ -421,9 +397,9 @@ func (a *App) handleVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	message := "Voter ballot accepted. Stake escrowed on Ganache and cryptographic proofs verified."
+	message := "Voter ballot accepted by the atomic on-chain RB-PVSS verifier and stake escrowed on Ganache."
 	if !snapshot.Chain.Available {
-		message = "Voter ballot accepted off-chain. Cryptographic proofs verified; no Ganache stake or reward settlement is active."
+		message = "Voter ballot accepted off-chain. Cryptographic proofs verified; no Ganache contracts are active."
 	}
 	writeJSON(w, http.StatusOK, APIResponse{
 		Message: message,
@@ -546,9 +522,9 @@ func (a *App) handleWithdrawTallier(w http.ResponseWriter, r *http.Request) {
 
 func defaultConfig() DemoConfig {
 	return DemoConfig{
-		NumTalliers:            4,
-		NumCandidates:          3,
-		Threshold:              3,
+		NumTalliers:            7,
+		NumCandidates:          2,
+		Threshold:              4,
 		RangeMin:               0,
 		RangeMax:               5,
 		InitiatorEscrowETH:     "6",
@@ -566,26 +542,27 @@ func newDemoState(cfg DemoConfig) (*DemoState, error) {
 		return nil, err
 	}
 
-	_, pp := ZKRP.Setup(cfg.RangeMin, cfg.RangeMax)
-	sks, pks := PVSS.Setup(cfg.NumTalliers, pp.G0)
+	pp, sks, err := rbpvss.Setup(128, cfg.NumTalliers, cfg.Threshold, cfg.NumCandidates, rbpvss.Interval{
+		Min: int64(cfg.RangeMin),
+		Max: int64(cfg.RangeMax),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("RB-PVSS.Setup: %w", err)
+	}
+	aggregate, err := rbpvss.NewAggregate(pp)
+	if err != nil {
+		return nil, fmt.Errorf("initialize RB-PVSS aggregate: %w", err)
+	}
 
 	state := &DemoState{
 		Config:      cfg,
 		SessionID:   newSessionID(),
 		PP:          pp,
 		TallierSKs:  sks,
-		TallierPKs:  pks,
-		AggregateC:  make([]*bn256.G1, cfg.NumTalliers),
-		AggregateU:  make([]*bn256.G1, cfg.NumCandidates),
+		TallierPKs:  pp.PK,
+		Aggregate:   aggregate,
 		Decryptions: make(map[int]*TallierRecord),
 		CreatedAt:   time.Now(),
-	}
-
-	for i := range state.AggregateC {
-		state.AggregateC[i] = zeroPoint()
-	}
-	for i := range state.AggregateU {
-		state.AggregateU[i] = zeroPoint()
 	}
 
 	state.appendEvent(
@@ -601,7 +578,7 @@ func newDemoState(cfg DemoConfig) (*DemoState, error) {
 		),
 	)
 
-	chain, chainErr := NewStakeChain(cfg, pp, pks)
+	chain, chainErr := NewStakeChain(cfg, pp)
 	if chainErr != nil {
 		state.ChainError = chainErr.Error()
 		state.appendEvent(
@@ -616,11 +593,7 @@ func newDemoState(cfg DemoConfig) (*DemoState, error) {
 	state.appendEvent(
 		"initiator",
 		"Ganache contracts deployed",
-		fmt.Sprintf(
-			"Escrow contract %s manages deposits and rewards; verification contract %s stores public parameters and verifies PVSS/ZKRP/PVerifyTally transactions.",
-			chain.ContractAddress.Hex(),
-			chain.VerificationAddress.Hex(),
-		),
+		fmt.Sprintf("Settlement contract %s and atomic RB-PVSS verifier %s are deployed from the same public parameters.", chain.ContractAddress.Hex(), chain.VerifierAddress.Hex()),
 	)
 
 	return state, nil
@@ -639,8 +612,9 @@ func normalizeConfig(cfg DemoConfig) (DemoConfig, error) {
 		cfg.RangeMin = defaults.RangeMin
 		cfg.RangeMax = defaults.RangeMax
 	}
+	expectedThreshold := (cfg.NumTalliers + cfg.NumCandidates) / 2
 	if cfg.Threshold == 0 {
-		cfg.Threshold = minInt(cfg.NumTalliers, maxInt(2, (cfg.NumTalliers+cfg.NumCandidates)/2))
+		cfg.Threshold = expectedThreshold
 	}
 	if strings.TrimSpace(cfg.InitiatorEscrowETH) == "" {
 		cfg.InitiatorEscrowETH = defaults.InitiatorEscrowETH
@@ -657,20 +631,26 @@ func normalizeConfig(cfg DemoConfig) (DemoConfig, error) {
 		cfg.TallierRewardPercent = defaults.TallierRewardPercent
 	}
 
-	if cfg.NumTalliers < 2 || cfg.NumTalliers > 8 {
-		return cfg, errors.New("numTalliers must be between 2 and 8")
+	if cfg.NumTalliers < 3 || cfg.NumTalliers > 8 {
+		return cfg, errors.New("numTalliers must be between 3 and 8")
 	}
 	if cfg.NumCandidates < 1 || cfg.NumCandidates > 6 {
 		return cfg, errors.New("numCandidates must be between 1 and 6")
 	}
-	if cfg.RangeMin < 0 {
-		return cfg, errors.New("rangeMin must be >= 0")
+	if cfg.NumCandidates > cfg.NumTalliers/3 {
+		return cfg, errors.New("paper parameters require numCandidates <= floor(numTalliers/3)")
 	}
 	if cfg.RangeMax < cfg.RangeMin {
 		return cfg, errors.New("rangeMax must be >= rangeMin")
 	}
 	if cfg.Threshold < 2 || cfg.Threshold > cfg.NumTalliers {
 		return cfg, errors.New("threshold must be between 2 and numTalliers")
+	}
+	if cfg.Threshold != expectedThreshold {
+		return cfg, fmt.Errorf("paper parameters require threshold=floor((n+l)/2)=%d", expectedThreshold)
+	}
+	if cfg.NumCandidates >= cfg.Threshold {
+		return cfg, errors.New("RB-PVSS requires numCandidates < threshold")
 	}
 	if cfg.InitiatorRewardPercent < 0 || cfg.VoterRewardPercent < 0 || cfg.TallierRewardPercent < 0 {
 		return cfg, errors.New("reward percentages must be non-negative")
@@ -713,53 +693,14 @@ func (s *DemoState) submitVote(alias string, scores []int) error {
 	}
 	nextVoterID := len(s.Votes) + 1
 
-	secret, err := rand.Int(rand.Reader, bn256.Order)
-	if err != nil {
-		return fmt.Errorf("generate voter secret: %w", err)
-	}
-
-	share := PVSS.Share(secret, s.PP.H0, s.TallierPKs, s.Config.Threshold, s.Config.NumTalliers, s.Config.NumCandidates)
-	pvssVerified := PVSS.DVerify(share, s.PP.H0, s.TallierPKs, s.Config.NumTalliers, s.Config.NumCandidates)
-	if !pvssVerified {
-		return errors.New("pvss verification failed")
-	}
-
-	coefficients, err := randomPolynomial(s.Config.Threshold)
-	if err != nil {
-		return fmt.Errorf("generate proof polynomial: %w", err)
-	}
-
-	indices := sequentialIndices(s.Config.Threshold)
-	selectedShares := share.V[:s.Config.Threshold]
-	ballots := make([]*bn256.G1, s.Config.NumCandidates)
-	proofs := make([]*ZKRP.Proof, s.Config.NumCandidates)
-
+	vector := make([]int64, len(scores))
 	for i, score := range scores {
-		scoreValue := big.NewInt(int64(score))
-		ballots[i] = new(bn256.G1).Add(
-			new(bn256.G1).ScalarMult(s.PP.G0, share.BindValue[i]),
-			new(bn256.G1).ScalarMult(s.PP.H0, scoreValue),
-		)
-
-		x := candidateCoordinate(i)
-		proofs[i] = ZKRP.GenProof(
-			s.PP.G0,
-			s.PP.H0,
-			s.PP.G1,
-			share.BindValue[i],
-			scoreValue,
-			ballots[i],
-			s.PP.Sigma_k[score-s.Config.RangeMin],
-			x,
-			coefficients,
-		)
-
-		if !ZKRP.Verify(s.PP.G0, s.PP.H0, s.PP.G1, s.PP.PKI, proofs[i], ballots[i], x, selectedShares, indices, s.Config.Threshold) {
-			return fmt.Errorf("range proof verification failed for candidate %d", i+1)
-		}
+		vector[i] = int64(score)
 	}
-
-	var verificationUpload *VerificationUploadResult
+	instance, err := rbpvss.Share(s.PP, vector)
+	if err != nil {
+		return fmt.Errorf("RB-PVSS.Share: %w", err)
+	}
 	if s.Chain != nil {
 		if err := s.ensureInitiatorEscrowFunded(); err != nil {
 			return err
@@ -767,45 +708,29 @@ func (s *DemoState) submitVote(alias string, scores []int) error {
 		if _, err := s.Chain.StakeVoter(nextVoterID); err != nil {
 			return err
 		}
-		verificationUpload, err = s.Chain.UploadVoteProofs(nextVoterID, share, ballots, proofs, s.Config.Threshold)
-		if err != nil {
+		if err := s.Chain.SubmitRB(nextVoterID, instance); err != nil {
 			return err
 		}
 	}
 
-	for i := range s.AggregateC {
-		s.AggregateC[i] = new(bn256.G1).Add(s.AggregateC[i], share.C[i])
-	}
-	for i := range s.AggregateU {
-		s.AggregateU[i] = new(bn256.G1).Add(s.AggregateU[i], ballots[i])
+	if err := rbpvss.AggregateVerified(s.PP, s.Aggregate, instance); err != nil {
+		return fmt.Errorf("aggregate accepted RB-PVSS transcript: %w", err)
 	}
 
 	record := &VoterRecord{
 		ID:            nextVoterID,
 		Alias:         alias,
 		Scores:        cloneInts(scores),
-		Share:         share,
-		Ballots:       ballots,
-		Proofs:        proofs,
-		PVSSVerified:  pvssVerified,
+		Instance:      instance,
+		PVSSVerified:  true,
 		RangeVerified: true,
 		SubmittedAt:   time.Now(),
-	}
-	if verificationUpload != nil {
-		record.PVSSOnChain = verificationUpload.PVSSOK
-		record.RangeOnChain = verificationUpload.ZKRPOK
-		record.PVSSTxHash = verificationUpload.PVSSTxHash
-		record.ZKRPTxHash = verificationUpload.ZKRPTxHash
-		record.PVSSGasUsed = verificationUpload.PVSSGasUsed
-		record.ZKRPGasUsed = verificationUpload.ZKRPGasUsed
 	}
 	s.Votes = append(s.Votes, record)
 
 	stakeDetail := "an on-chain voter stake"
 	if s.Chain == nil {
 		stakeDetail = "an off-chain record without Ganache stake"
-	} else if verificationUpload != nil {
-		stakeDetail = fmt.Sprintf("on-chain PVSS/ZKRP verification (gas %d + %d)", verificationUpload.PVSSGasUsed, verificationUpload.ZKRPGasUsed)
 	}
 	s.appendEvent(
 		"voter",
@@ -839,21 +764,17 @@ func (s *DemoState) decryptTallier(id int) error {
 		}
 	}
 
-	aggregateC := s.AggregateC
-	if s.Chain != nil {
-		chainAggregateC, err := s.Chain.ReadAggregatedC()
-		if err != nil {
-			return fmt.Errorf("read on-chain aggregated encrypted shares: %w", err)
-		}
-		if len(chainAggregateC) < s.Config.NumTalliers {
-			return errors.New("verification contract has incomplete aggregated encrypted shares")
-		}
-		aggregateC = chainAggregateC
+	share, proof, err := rbpvss.Decrypt(s.PP, s.Aggregate.C[id-1], s.TallierSKs[id-1])
+	if err != nil {
+		return fmt.Errorf("RB-PVSS.Decrypt: %w", err)
 	}
-
-	share, proof := PVSS.Decrypt(s.PP.G0, s.TallierPKs[id-1], aggregateC[id-1], s.TallierSKs[id-1])
-	if !PVSS.PVerify(s.PP.G0, s.TallierPKs[id-1], aggregateC[id-1], share, proof) {
+	if !rbpvss.PVerify(s.PP, id, share, s.Aggregate.C[id-1], proof) {
 		return errors.New("generated decryption proof failed verification")
+	}
+	if s.Chain != nil {
+		if err := s.Chain.SubmitDecryptionShare(id, share, proof); err != nil {
+			return err
+		}
 	}
 
 	s.Decryptions[id] = &TallierRecord{
@@ -892,50 +813,39 @@ func (s *DemoState) finalizeTally() error {
 	minTotal := len(s.Votes) * s.Config.RangeMin
 	maxTotal := len(s.Votes) * s.Config.RangeMax
 	verifiedPlaintext := true
-	onChainVerified := false
-	verificationTx := ""
-	var verificationGas uint64
 
-	if s.Chain != nil {
-		chainTally, err := s.Chain.VerifyTallierSharesAndTally(verified[:s.Config.Threshold], s.Config.Threshold, s.Config.NumCandidates)
-		if err != nil {
-			return err
-		}
-		if len(chainTally.Points) < s.Config.NumCandidates {
-			return fmt.Errorf("verification contract returned %d tally points, expected %d", len(chainTally.Points), s.Config.NumCandidates)
-		}
-		copy(points, chainTally.Points[:s.Config.NumCandidates])
-		onChainVerified = true
-		verificationTx = chainTally.TxHash
-		verificationGas = chainTally.GasUsed
-	} else {
-		indices := make([]*big.Int, s.Config.Threshold)
-		shares := make([]*bn256.G1, s.Config.Threshold)
-		for i, rec := range verified[:s.Config.Threshold] {
-			indices[i] = big.NewInt(int64(rec.ID))
-			shares[i] = rec.Share
-		}
-
-		for d := 0; d < s.Config.NumCandidates; d++ {
-			coefficients := PVSS.LagrangeCoefficient(candidateCoordinate(d), indices, s.Config.Threshold)
-			blindCommitment := PVSS.Reconstruct(coefficients, shares)
-			points[d] = new(bn256.G1).Add(s.AggregateU[d], new(bn256.G1).Neg(blindCommitment))
-		}
+	shareSet := make([]rbpvss.IndexedShare, s.Config.Threshold)
+	for i, rec := range verified[:s.Config.Threshold] {
+		shareSet[i] = rbpvss.IndexedShare{Index: rec.ID, Share: rec.Share}
 	}
-
-	for d := 0; d < s.Config.NumCandidates; d++ {
-		value, err := decodeCommitment(s.PP.H0, points[d], minTotal, maxTotal)
-		if err != nil {
-			return fmt.Errorf("failed to decode tally for candidate %d: %w", d+1, err)
-		}
-
-		results[d] = value
-		if value != expected[d] {
+	recovered, err := rbpvss.Recon(s.PP, shareSet, s.Aggregate.U, rbpvss.Interval{
+		Min: int64(minTotal),
+		Max: int64(maxTotal),
+	})
+	if err != nil {
+		return fmt.Errorf("RB-PVSS.Recon: %w", err)
+	}
+	for d, value := range recovered {
+		results[d] = int(value)
+		points[d] = new(bn256.G1).ScalarMult(s.PP.PP1.H0, rbpvss.Iota(value))
+		if results[d] != expected[d] {
 			verifiedPlaintext = false
 		}
 	}
 
 	if s.Chain != nil {
+		onChainPoints, err := s.Chain.Reconstruct()
+		if err != nil {
+			return fmt.Errorf("on-chain RB-PVSS.Recon: %w", err)
+		}
+		if len(onChainPoints) != len(points) {
+			return errors.New("on-chain reconstruction returned the wrong coordinate count")
+		}
+		for d := range points {
+			if string(onChainPoints[d].Marshal()) != string(points[d].Marshal()) {
+				return fmt.Errorf("on-chain reconstruction mismatch at coordinate %d", d)
+			}
+		}
 		honestTallierIDs := make([]int, s.Config.Threshold)
 		for i, rec := range verified[:s.Config.Threshold] {
 			honestTallierIDs[i] = rec.ID
@@ -952,19 +862,13 @@ func (s *DemoState) finalizeTally() error {
 	}
 
 	s.Tally = &TallyRecord{
-		Results:         results,
-		Points:          points,
-		Verified:        verifiedPlaintext,
-		OnChainVerified: onChainVerified,
-		VerificationTx:  verificationTx,
-		VerificationGas: verificationGas,
-		FinalizedAt:     time.Now(),
+		Results:     results,
+		Points:      points,
+		Verified:    verifiedPlaintext,
+		FinalizedAt: time.Now(),
 	}
 
 	finalizeDetail := fmt.Sprintf("Recovered %d candidate totals using %d verified tallier shares.", s.Config.NumCandidates, s.Config.Threshold)
-	if onChainVerified {
-		finalizeDetail = fmt.Sprintf("%s Verification.sol PVerifyTally tx %s used %d gas.", finalizeDetail, shortHex(verificationTx), verificationGas)
-	}
 	s.appendEvent(
 		"tallier",
 		"Threshold tally finalized",
@@ -1122,13 +1026,13 @@ func (s *DemoState) snapshot() StateSnapshot {
 	}
 
 	aggregate := AggregateSnapshot{
-		EncryptedShares: make([]string, len(s.AggregateC)),
-		BallotCipher:    make([]string, len(s.AggregateU)),
+		EncryptedShares: make([]string, len(s.Aggregate.C)),
+		BallotCipher:    make([]string, len(s.Aggregate.U)),
 	}
-	for i, point := range s.AggregateC {
+	for i, point := range s.Aggregate.C {
 		aggregate.EncryptedShares[i] = pointFingerprint(point)
 	}
-	for i, point := range s.AggregateU {
+	for i, point := range s.Aggregate.U {
 		aggregate.BallotCipher[i] = pointFingerprint(point)
 	}
 
@@ -1139,11 +1043,11 @@ func (s *DemoState) snapshot() StateSnapshot {
 		ballots := make([]string, s.Config.NumCandidates)
 
 		for idx := 0; idx < s.Config.NumCandidates; idx++ {
-			binds[idx] = pointFingerprint(vote.Share.V[s.Config.NumTalliers+idx])
-			ballots[idx] = pointFingerprint(vote.Ballots[idx])
+			binds[idx] = pointFingerprint(vote.Instance.V[idx])
+			ballots[idx] = pointFingerprint(vote.Instance.U[idx])
 		}
 		for idx := 0; idx < s.Config.NumTalliers; idx++ {
-			encrypted[idx] = pointFingerprint(vote.Share.C[idx])
+			encrypted[idx] = pointFingerprint(vote.Instance.C[idx])
 		}
 
 		finance, exists := voterStake[vote.ID]
@@ -1157,10 +1061,6 @@ func (s *DemoState) snapshot() StateSnapshot {
 			Scores:          cloneInts(vote.Scores),
 			PVSSVerified:    vote.PVSSVerified,
 			RangeVerified:   vote.RangeVerified,
-			PVSSOnChain:     vote.PVSSOnChain,
-			RangeOnChain:    vote.RangeOnChain,
-			PVSSGasUsed:     vote.PVSSGasUsed,
-			ZKRPGasUsed:     vote.ZKRPGasUsed,
 			SubmittedAt:     vote.SubmittedAt.Format("15:04:05"),
 			BindCommitments: binds,
 			EncryptedShares: encrypted,
@@ -1180,7 +1080,7 @@ func (s *DemoState) snapshot() StateSnapshot {
 		if ok {
 			talliers[i].Verified = rec.Verified
 			talliers[i].Share = pointFingerprint(rec.Share)
-			talliers[i].Proof = scalarFingerprint(rec.Proof.C)
+			talliers[i].Proof = scalarFingerprint(rec.Proof.Chi)
 			talliers[i].DecryptedAt = rec.DecryptedAt.Format("15:04:05")
 		}
 		if finance, exists := tallierStake[i+1]; exists {
@@ -1225,10 +1125,10 @@ func (s *DemoState) snapshot() StateSnapshot {
 			Config:          s.Config,
 			CandidateLabels: candidateLabels(s.Config.NumCandidates),
 			PublicParams: ParameterSnapshot{
-				G0:  pointFingerprint(s.PP.G0),
-				H0:  pointFingerprint(s.PP.H0),
-				G1:  point2Fingerprint(s.PP.G1),
-				PKI: point2Fingerprint(s.PP.PKI),
+				G0:  pointFingerprint(s.PP.PP1.G0),
+				H0:  pointFingerprint(s.PP.PP1.H0),
+				G1:  point2Fingerprint(s.PP.PP2.G1),
+				PKI: point2Fingerprint(s.PP.PP2.PKI),
 			},
 			TallierKeys: tallierKeys,
 			Aggregate:   aggregate,
@@ -1251,12 +1151,9 @@ func (s *DemoState) snapshot() StateSnapshot {
 		}
 
 		snapshot.Tally = &TallySnapshot{
-			FinalizedAt:     s.Tally.FinalizedAt.Format("15:04:05"),
-			Verified:        s.Tally.Verified,
-			OnChainVerified: s.Tally.OnChainVerified,
-			VerificationTx:  s.Tally.VerificationTx,
-			VerificationGas: s.Tally.VerificationGas,
-			Results:         results,
+			FinalizedAt: s.Tally.FinalizedAt.Format("15:04:05"),
+			Verified:    s.Tally.Verified,
+			Results:     results,
 		}
 	}
 
@@ -1269,9 +1166,8 @@ func (s *DemoState) buildChainSnapshot() (ChainSnapshot, map[int]FinanceSnapshot
 
 	base := ChainSnapshot{
 		Available:          s.Chain != nil,
-		Status:             "Ganache stake manager unavailable",
+		Status:             "Ganache contracts unavailable",
 		RPCURL:             ganacheURL,
-		VerificationStatus: "Verification contract unavailable",
 		InitiatorEscrowEth: s.Config.InitiatorEscrowETH,
 		VoterStakeEth:      s.Config.VoterStakeETH,
 		TallierStakeEth:    s.Config.TallierStakeETH,
@@ -1298,22 +1194,8 @@ func (s *DemoState) buildChainSnapshot() (ChainSnapshot, map[int]FinanceSnapshot
 	}
 
 	base.ContractAddress = s.Chain.ContractAddress.Hex()
-	base.VerificationAddress = s.Chain.VerificationAddress.Hex()
+	base.VerifierAddress = s.Chain.VerifierAddress.Hex()
 	base.MaxVoters = len(s.Chain.Voters)
-
-	if verification, err := s.Chain.ReadVerificationOverview(); err != nil {
-		base.VerificationStatus = fmt.Sprintf("Verification read failed: %v", err)
-	} else {
-		base.VerificationAddress = verification.ContractAddress
-		base.DVerifyCount = verification.DVerifyCount
-		base.ZKRPVerifyCount = verification.ZKRPVerifyCount
-		base.PVerifyCount = verification.PVerifyCount
-		base.VerificationStatus = fmt.Sprintf("%d PVSS uploads, %d ZKRP uploads, %d PVerify records", verification.DVerifyCount, verification.ZKRPVerifyCount, verification.PVerifyCount)
-	}
-	if s.Tally != nil && s.Tally.OnChainVerified {
-		base.PVerifyCount = maxInt(base.PVerifyCount, s.Config.Threshold)
-		base.VerificationStatus = fmt.Sprintf("%d PVSS uploads, %d ZKRP uploads, PVerifyTally confirmed %d tallier shares", base.DVerifyCount, base.ZKRPVerifyCount, base.PVerifyCount)
-	}
 
 	overview, err := s.Chain.ReadOverview()
 	if err != nil {
@@ -1401,46 +1283,6 @@ func (s *DemoState) appendEvent(role, title, detail string) {
 	if len(s.Events) > 18 {
 		s.Events = s.Events[:18]
 	}
-}
-
-func decodeCommitment(base *bn256.G1, point *bn256.G1, start, end int) (int, error) {
-	target := point.Marshal()
-	for value := start; value <= end; value++ {
-		candidate := new(bn256.G1).ScalarMult(base, big.NewInt(int64(value)))
-		if string(candidate.Marshal()) == string(target) {
-			return value, nil
-		}
-	}
-	return 0, fmt.Errorf("commitment did not match any scalar in [%d, %d]", start, end)
-}
-
-func randomPolynomial(length int) ([]*big.Int, error) {
-	coefficients := make([]*big.Int, length)
-	for i := range coefficients {
-		value, err := rand.Int(rand.Reader, bn256.Order)
-		if err != nil {
-			return nil, err
-		}
-		coefficients[i] = value
-	}
-	return coefficients, nil
-}
-
-func sequentialIndices(threshold int) []*big.Int {
-	indices := make([]*big.Int, threshold)
-	for i := 0; i < threshold; i++ {
-		indices[i] = big.NewInt(int64(i + 1))
-	}
-	return indices
-}
-
-func candidateCoordinate(index int) *big.Int {
-	x := new(big.Int).Neg(big.NewInt(int64(index)))
-	return x.Mod(x, bn256.Order)
-}
-
-func zeroPoint() *bn256.G1 {
-	return new(bn256.G1).ScalarBaseMult(big.NewInt(0))
 }
 
 func newSessionID() string {
