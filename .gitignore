@@ -1,2 +1,16 @@
-
 PVSS.py
+
+# Manuscripts, review material, and local LaTeX settings
+/paper/
+/.vscode/settings.json
+*.tex
+*.bib
+*.sty
+*.cls
+*.eps
+
+# Generated paper outputs and figures
+/output/pdf/
+/tmp/pdfs/
+/experiments/**/*.pdf
+/experiments/**/*.png
