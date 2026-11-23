@@ -1,0 +1,4 @@
+metric,samples,mean_ms,sd_ms,min_ms,median_ms,max_ms
+production_decode_including_table,10,271.5631584,50.40221762822825,186.53775,290.5010415,334.182292
+cached_table_query,10,92.8506458,50.038483627901826,10.405333,100.988687,158.991792
+one_time_cached_table_construction,1,175.286125,,175.286125,175.286125,175.286125

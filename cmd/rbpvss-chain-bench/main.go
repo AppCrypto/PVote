@@ -35,11 +35,6 @@ type result struct {
 	reconstruct                   uint64
 }
 
-type voterScalingResult struct {
-	n, l, acceptedCount int
-	gas                 uint64
-}
-
 func main() {
 	url := flag.String("url", envOr("PVOTE_EVM_URL", "http://127.0.0.1:8545"), "EVM JSON-RPC URL")
 	privateKeyHex := flag.String("private-key", envOr("PVOTE_EVM_PRIVATE_KEY", ""), "funded development account key")
@@ -48,7 +43,21 @@ func main() {
 	voterScalingOut := flag.String("voter-scaling-out", "experiments/voter_gas_by_m.csv", "voter-count validation CSV output path")
 	onlyVoterScaling := flag.Bool("only-voter-scaling", false, "run only the fixed-(n,l) voter-count validation")
 	voterScalingConfigs := flag.String("voter-scaling-configs", "10:1", "comma-separated n:l configurations for voter-count validation")
+	accountKeysFile := flag.String("account-keys-file", "", "Ganache development-wallet JSON file; never written to results")
+	voterScalingCount := flag.Int("voter-scaling-count", 0, "number of distinct voters (0 uses all supplied accounts)")
+	executionHardfork := flag.String("execution-hardfork", "unspecified", "execution hardfork configured on the local test chain")
 	flag.Parse()
+	var scalingKeys []*ecdsa.PrivateKey
+	if *accountKeysFile != "" || strings.TrimSpace(*privateKeysCSV) != "" {
+		var err error
+		scalingKeys, err = voterScalingKeys(*privateKeysCSV, *accountKeysFile, *voterScalingCount)
+		if err != nil {
+			panic(err)
+		}
+	}
+	if *privateKeyHex == "" && len(scalingKeys) != 0 {
+		*privateKeyHex = fmt.Sprintf("%064x", scalingKeys[0].D)
+	}
 	if *privateKeyHex == "" {
 		panic("provide -private-key or PVOTE_EVM_PRIVATE_KEY")
 	}
@@ -80,31 +89,16 @@ func main() {
 			panic(err)
 		}
 	}
-	if strings.TrimSpace(*privateKeysCSV) != "" {
-		keys, err := parsePrivateKeys(*privateKeysCSV)
-		if err != nil {
-			panic(err)
-		}
+	if len(scalingKeys) != 0 {
 		configs, err := parseVoterScalingConfigs(*voterScalingConfigs)
 		if err != nil {
 			panic(err)
 		}
-		var rows []voterScalingResult
-		for _, config := range configs {
-			configRows, err := benchmarkVoterScaling(client, keys, config[0], config[1])
-			if err != nil {
-				panic(fmt.Errorf("voter scaling n=%d,l=%d: %w", config[0], config[1], err))
-			}
-			rows = append(rows, configRows...)
-		}
-		if err := writeVoterScalingCSV(*voterScalingOut, rows); err != nil {
+		if err := runVoterScaling(client, scalingKeys, configs, *voterScalingOut, *executionHardfork); err != nil {
 			panic(err)
 		}
-		for _, row := range rows {
-			fmt.Printf("fixed n=%d l=%d accepted_count=%d voter_gas=%d\n", row.n, row.l, row.acceptedCount, row.gas)
-		}
 	} else if *onlyVoterScaling {
-		panic("-only-voter-scaling requires -private-keys or PVOTE_EVM_PRIVATE_KEYS")
+		panic("-only-voter-scaling requires -account-keys-file or -private-keys")
 	}
 }
 
@@ -152,60 +146,6 @@ func parsePrivateKeys(csvValue string) ([]*ecdsa.PrivateKey, error) {
 		return nil, fmt.Errorf("voter-count validation requires at least two private keys")
 	}
 	return keys, nil
-}
-
-func benchmarkVoterScaling(client *ethclient.Client, keys []*ecdsa.PrivateKey, n, l int) ([]voterScalingResult, error) {
-	t := (n + l) / 2
-	pp, _, err := core.Setup(128, n, t, l, core.Interval{Min: 0, Max: 10})
-	if err != nil {
-		return nil, err
-	}
-	voterAccounts := make([]common.Address, len(keys))
-	for i, key := range keys {
-		voterAccounts[i] = crypto.PubkeyToAddress(key.PublicKey)
-	}
-	deployer, err := bind.NewKeyedTransactorWithChainID(keys[0], big.NewInt(1337))
-	if err != nil {
-		return nil, err
-	}
-	deployer.GasLimit = transactionGasLimit
-	g0, h0, g1, pkI, sigma, pks, threshold, coordinates, minimum, maximum, err := chain.ConstructorArguments(pp)
-	if err != nil {
-		return nil, err
-	}
-	_, tx, verifier, err := contract.DeployContract(deployer, client, g0, h0, g1, pkI, sigma, pks, threshold, coordinates, minimum, maximum, voterAccounts)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := successfulReceipt(client, tx); err != nil {
-		return nil, err
-	}
-	rows := make([]voterScalingResult, 0, len(keys))
-	for i, key := range keys {
-		instance, err := core.Share(pp, make([]int64, l))
-		if err != nil {
-			return nil, err
-		}
-		dealer, rangeBinding, err := chain.Transcript(instance)
-		if err != nil {
-			return nil, err
-		}
-		auth, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-		if err != nil {
-			return nil, err
-		}
-		auth.GasLimit = transactionGasLimit
-		tx, err := verifier.SubmitRB(auth, dealer, rangeBinding)
-		if err != nil {
-			return nil, fmt.Errorf("submit voter %d: %w", i+1, err)
-		}
-		gas, err := successfulReceipt(client, tx)
-		if err != nil {
-			return nil, fmt.Errorf("submit voter %d: %w", i+1, err)
-		}
-		rows = append(rows, voterScalingResult{n: n, l: l, acceptedCount: i + 1, gas: gas})
-	}
-	return rows, nil
 }
 
 func benchmarkPair(client *ethclient.Client, key *ecdsa.PrivateKey, n, l int) (result, error) {
@@ -328,27 +268,6 @@ func writeCSV(path string, rows []result) error {
 			strconv.Itoa(row.n), strconv.Itoa(row.l), strconv.Itoa(row.t), "1337", "ganache-v7.9.2", runtime.Version(),
 			strconv.FormatUint(row.deployment, 10), strconv.FormatUint(row.submit, 10), strconv.FormatUint(row.shareMean, 10),
 			strconv.FormatFloat(row.shareStd, 'f', 3, 64), strconv.FormatUint(row.reconstruct, 10),
-		}); err != nil {
-			return err
-		}
-	}
-	return writer.Error()
-}
-
-func writeVoterScalingCSV(path string, rows []voterScalingResult) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-	if err := writer.Write([]string{"n", "l", "accepted_count", "chain_id", "client", "go_version", "submit_rb_gas"}); err != nil {
-		return err
-	}
-	for _, row := range rows {
-		if err := writer.Write([]string{
-			strconv.Itoa(row.n), strconv.Itoa(row.l), strconv.Itoa(row.acceptedCount), "1337", "ganache-v7.9.2", runtime.Version(), strconv.FormatUint(row.gas, 10),
 		}); err != nil {
 			return err
 		}

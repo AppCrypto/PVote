@@ -1,0 +1,10 @@
+{
+  "hardwareIdentifier": "Mac16,12",
+  "cpu": "Apple M4",
+  "physicalMemoryBytes": 17179869184,
+  "logicalCPUs": 10,
+  "osVersion": "26.5.2",
+  "verifiedAt": "2026-11-21T11:35:18.939999+00:00",
+  "command": "sysctl -n hw.model machdep.cpu.brand_string hw.memsize hw.logicalcpu",
+  "note": "Captured outside the workspace sandbox after nested sysctl calls in the runner returned unavailable. Original raw reports are unmodified."
+}

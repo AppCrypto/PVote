@@ -1,20 +1,20 @@
 #!/bin/bash
 #start-ganache-and-save-keyssh
 
-# 调试信息输出
+# Debug output
 set -x
 
-# 启动 Ganache CLI 并将输出重定向到临时文件
+# Start Ganache and capture output
 ganache --mnemonic "PVote" > ganache_output.txt &
 
-# 等待 Ganache CLI 完全启动
+# Wait for Ganache
 sleep 5
 
-# 列出当前的 Node.js 进程
+# List Node.js processes
 echo "Before killing process:"
 pgrep -fl node
 
-# 获取占用端口 8545 的进程 ID
+# Find the process on port 8545
 GANACHE_PID=$(lsof -t -i:8545)
 if [ ! -z "$GANACHE_PID" ]; then
   echo "Killing process $GANACHE_PID occupying port 8545"
@@ -24,22 +24,22 @@ else
   echo "No process found occupying port 8545"
 fi
 
-# 检查进程是否成功终止
+# Check process termination
 if sudo kill -0 $GANACHE_PID 2>/dev/null; then
   echo "Failed to kill process $GANACHE_PID"
 else
   echo "Process $GANACHE_PID killed successfully"
 fi
 
-# 创建或清空现有的 .env 文件
+# Initialize .env
 echo "" > .env
 
-# 读取私钥并写入到 .env 文件，去掉 '0x' 前缀
+# Write keys without the 0x prefix to .env
 cat ganache_output.txt | grep 'Private Keys' -A 12 | grep -o '0x.*' | while read -r line; do
   echo "PRIVATE_KEY_$((++i))=${line:2}" >> .env
 done
 
-# 清理临时文件
+# Remove temporary files
 rm ganache_output.txt
 
 echo "Private keys saved to .env file."

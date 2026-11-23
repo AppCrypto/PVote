@@ -1,10 +1,10 @@
 #!/bin/bash
 #start-ganache-and-save-keyssh
 
-# 调试信息输出
+# Debug output
 set -x
 
-# 启动 Ganache CLI 并将输出重定向到临时文件
+# Start Ganache and capture output
 OS=$(uname -s)
  
 case "$OS" in
@@ -24,11 +24,11 @@ case "$OS" in
     ;;
 esac
 
-# 等待 Ganache CLI 完全启动
+# Wait for Ganache
 sleep 5
 rm .env
 
-# 提取可用账户并写入到 .env 文件
+# Write accounts to .env
 i=1
 cat ganache_output.txt | grep -A 12 'Available Accounts' | grep '0x' | while read -r line; do
   address=$(echo $line | awk '{print $2}')
@@ -36,10 +36,10 @@ cat ganache_output.txt | grep -A 12 'Available Accounts' | grep '0x' | while rea
   ((i++))
 done
 a=0
-# 读取私钥并写入到 .env 文件，去掉 '0x' 前缀
+# Write keys without the 0x prefix to .env
 cat ganache_output.txt | grep 'Private Keys' -A 12 | grep -o '0x.*' | while read -r line; do
   echo "PRIVATE_KEY_$((++a))=${line:2}" >> .env
 done
-#这个命令在ubuntu系统中存在不会杀死ganache的bug，ganache在ubuntu启动的进程为node，使用之后，需要手动kill杀死占用端口的进程
+#On Ubuntu, Ganache may require manual cleanup
 rm ganache_output.txt
 ps -ef|grep 'ganache'|xargs kill -9

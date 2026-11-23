@@ -1,0 +1,22 @@
+{
+  "started_utc": "2026-11-20T12:27:45Z",
+  "finished_utc": "2026-11-20T12:28:10Z",
+  "completed": true,
+  "chain_id": "1337",
+  "client_version": "Ganache/v7.9.2/EthereumJS TestRPC/v7.9.2/ethereum-js",
+  "configured_execution_hardfork": "merge",
+  "block_gas_limit": 90071992547,
+  "transaction_gas_limit": 180000000,
+  "go_version": "go1.25.4",
+  "platform": "darwin/amd64",
+  "voters_per_configuration": 2,
+  "n_l_configurations": [
+    [
+      100,
+      19
+    ]
+  ],
+  "deployment_bytecode_keccak256": "0x10f848c1629a1fe3b2c36156bca8b5b6ba98d02d21c07fc66d66f565fcb282f6",
+  "score_policy": "fresh independent transcript per voter; all scores 0 in [0,10]",
+  "verifier_scope": "checked-in Solidity benchmark verifier (legacy transcript format); not a context-binding security test"
+}

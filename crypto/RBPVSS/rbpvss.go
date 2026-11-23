@@ -240,6 +240,10 @@ func ValidatePublicParameters(pp *PublicParameters) error {
 // Share implements RB-PVSS.Share(pp,w_j). It samples exactly one polynomial
 // p_j and uses p_j(d) both in v_jd and as the mask in U_jd.
 func Share(pp *PublicParameters, scores []int64) (*Instance, error) {
+	return share(pp, scores, nil)
+}
+
+func share(pp *PublicParameters, scores []int64, binding []byte) (*Instance, error) {
 	if err := validatePublicParameters(pp); err != nil {
 		return nil, err
 	}
@@ -293,7 +297,7 @@ func Share(pp *PublicParameters, scores []int64) (*Instance, error) {
 		instance.Phi.A[k] = new(bn256.G1).ScalarMult(pp.PP1.H0, randomizers[k])
 		instance.Phi.B[k] = new(bn256.G1).ScalarMult(pp.PK[k], randomizers[k])
 	}
-	instance.Phi.Chi = hashDealerTranscript(instance, l)
+	instance.Phi.Chi = hashBoundDealerTranscript(instance, l, binding)
 	for k := range pp.N {
 		instance.Phi.Z[k] = subMod(randomizers[k], mulMod(instance.Phi.Chi, shareEvaluations[k]))
 	}
@@ -304,7 +308,7 @@ func Share(pp *PublicParameters, scores []int64) (*Instance, error) {
 			new(bn256.G1).ScalarMult(pp.PP1.H0, Iota(w)),
 			new(bn256.G1).ScalarMult(pp.PP1.G0, s),
 		)
-		proof, err := proveRangeBinding(pp, k, s, w, instance.U[k], instance.V[k])
+		proof, err := proveRangeBinding(pp, k, s, w, instance.U[k], instance.V[k], binding)
 		if err != nil {
 			return nil, err
 		}
@@ -316,7 +320,14 @@ func Share(pp *PublicParameters, scores []int64) (*Instance, error) {
 // DVerify implements RB-PVSS.DVerify(pp,I_j). It verifies the underlying
 // PVSS transcript and every range-binding proof as one atomic object.
 func DVerify(pp *PublicParameters, instance *Instance) bool {
+	return dVerify(pp, instance, nil)
+}
+
+func dVerify(pp *PublicParameters, instance *Instance, binding []byte) bool {
 	if validatePublicParameters(pp) != nil || !validInstanceShape(pp, instance) {
+		return false
+	}
+	if len(binding) != 0 && !canonicalBallotScalars(instance) {
 		return false
 	}
 	l := len(pp.D)
@@ -333,14 +344,14 @@ func DVerify(pp *PublicParameters, instance *Instance) bool {
 			return false
 		}
 	}
-	if !equalScalar(instance.Phi.Chi, hashDealerTranscript(instance, l)) {
+	if !equalScalar(instance.Phi.Chi, hashBoundDealerTranscript(instance, l, binding)) {
 		return false
 	}
-	if !verifyRandomDualRS(pp, instance.V) {
+	if !verifyBoundDualRS(pp, instance, binding) {
 		return false
 	}
 	for k := range pp.D {
-		if !verifyRangeBinding(pp, instance.Pi[k], instance.U[k], instance.V[k]) {
+		if !verifyRangeBinding(pp, k, instance.Pi[k], instance.U[k], instance.V[k], binding) {
 			return false
 		}
 	}
@@ -456,13 +467,17 @@ func NewAggregate(pp *PublicParameters) (*Aggregate, error) {
 // AggregateVerified atomically verifies and accumulates one complete dealer
 // transcript. Neither C nor U is changed if DVerify rejects it.
 func AggregateVerified(pp *PublicParameters, aggregate *Aggregate, instance *Instance) error {
+	return aggregateVerified(pp, aggregate, instance, nil)
+}
+
+func aggregateVerified(pp *PublicParameters, aggregate *Aggregate, instance *Instance, binding []byte) error {
 	if err := validatePublicParameters(pp); err != nil {
 		return err
 	}
 	if aggregate == nil || len(aggregate.C) != len(pp.N) || len(aggregate.U) != len(pp.D) {
 		return ErrInvalidParameters
 	}
-	if !DVerify(pp, instance) {
+	if !dVerify(pp, instance, binding) {
 		return ErrInvalidTranscript
 	}
 	nextC := make([]*bn256.G1, len(aggregate.C))
@@ -479,7 +494,7 @@ func AggregateVerified(pp *PublicParameters, aggregate *Aggregate, instance *Ins
 	return nil
 }
 
-func proveRangeBinding(pp *PublicParameters, coordinate int, s *big.Int, w int64, u, v *bn256.G1) (*RangeProof, error) {
+func proveRangeBinding(pp *PublicParameters, coordinate int, s *big.Int, w int64, u, v *bn256.G1, binding []byte) (*RangeProof, error) {
 	beta, err := randomNonZeroScalar()
 	if err != nil {
 		return nil, err
@@ -507,7 +522,7 @@ func proveRangeBinding(pp *PublicParameters, coordinate int, s *big.Int, w int64
 	f := bn256.Pair(fBase, pp.PP2.G1)
 	uPrime := addG1(new(bn256.G1).ScalarMult(pp.PP1.H0, wPrime), new(bn256.G1).ScalarMult(pp.PP1.G0, sPrime))
 	cPrime := new(bn256.G1).ScalarMult(pp.PP1.H0, sPrime)
-	chi := hashRangeTranscript(e, u, v, fBase, uPrime, cPrime)
+	chi := hashBoundRangeTranscript(pp.D[coordinate], binding, e, u, v, fBase, uPrime, cPrime)
 	return &RangeProof{
 		E:      e,
 		F:      f,
@@ -521,7 +536,7 @@ func proveRangeBinding(pp *PublicParameters, coordinate int, s *big.Int, w int64
 	}, nil
 }
 
-func verifyRangeBinding(pp *PublicParameters, proof *RangeProof, u, v *bn256.G1) bool {
+func verifyRangeBinding(pp *PublicParameters, coordinate int, proof *RangeProof, u, v *bn256.G1, binding []byte) bool {
 	if !validRangeProof(proof) || u == nil || v == nil {
 		return false
 	}
@@ -529,7 +544,7 @@ func verifyRangeBinding(pp *PublicParameters, proof *RangeProof, u, v *bn256.G1)
 	if !equalGT(proof.F, encodedF) {
 		return false
 	}
-	if !equalScalar(proof.Chi, hashRangeTranscript(proof.E, u, v, proof.fBase, proof.UPrime, proof.CPrime)) {
+	if !equalScalar(proof.Chi, hashBoundRangeTranscript(pp.D[coordinate], binding, proof.E, u, v, proof.fBase, proof.UPrime, proof.CPrime)) {
 		return false
 	}
 	expectedCPrime := addG1(
@@ -573,6 +588,14 @@ func verifyRandomDualRS(pp *PublicParameters, commitments []*bn256.G1) bool {
 		if nonZero {
 			break
 		}
+	}
+	return verifyDualRS(pp, commitments, q)
+}
+
+func verifyDualRS(pp *PublicParameters, commitments []*bn256.G1, q []*big.Int) bool {
+	length := len(pp.D) + len(pp.N)
+	if len(commitments) != length || len(q) != length-pp.Threshold {
+		return false
 	}
 	points := make([]*big.Int, 0, length)
 	for _, d := range pp.D {

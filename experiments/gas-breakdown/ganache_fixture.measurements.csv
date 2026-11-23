@@ -1,0 +1,3 @@
+n,l,accepted_count,chain_id,client,go_version,submit_rb_gas,t,contract_address,voter_address,transaction_hash,block_number,receipt_status,calldata_bytes,transaction_gas_limit,block_gas_limit
+100,19,1,1337,Ganache/v7.9.2/EthereumJS TestRPC/v7.9.2/ethereum-js,go1.25.4,38469820,59,0x9850Fa28d129ee07fCb239a91ad0134Ee42Ea2ef,0x1f8D5b86afAc5CDb86Db7c27cFEF067A267c757D,0x558774d99a0a12039de21c0d81546b7b45a3c15afb1a58b8729601f46c312159,2,1,39524,180000000,90071992547
+100,19,2,1337,Ganache/v7.9.2/EthereumJS TestRPC/v7.9.2/ethereum-js,go1.25.4,34382848,59,0x9850Fa28d129ee07fCb239a91ad0134Ee42Ea2ef,0x3B8038E69cA3B133857d4F664d4f8FcA1A5526f3,0x16a86f7d72a49d6993419aa84231eff180c890015336bdda065cc6d185b24085,3,1,39524,180000000,90071992547

@@ -1,0 +1,151 @@
+{
+  "algorithm": "baby-step/giant-step",
+  "baseHex": "10531e51e7197db9ec646208fa0f82bc12583bee9caad98c14df2c088b7e74d508f9bdbc74114c6ec7dc745a3becbfa214ed21ca70656014b8248e66e8914572",
+  "boundaryChecks": "0, midpoint, maximum accepted; maximum+1 rejected",
+  "cachedPath": "measurement-only variant of the same BSGS search, reusing one table; no production change",
+  "coldPath": "existing boundedDLog called by Recon, including table construction for every target",
+  "experiment": "aggregate_bounded_discrete_log",
+  "finishedUTC": "2026-11-22T00:59:48.060514Z",
+  "intervalMax": 25500000,
+  "intervalMin": 0,
+  "intervalSize": 25500001,
+  "metadata": {
+    "binarySHA256": "b5ed970a053f4d01eaa1c8475e02b4a4cabdb29a366174dea985fe6e7700b4a7",
+    "build": "optimized Go test executable, no race instrumentation",
+    "cpu": "unavailable: exit status 1",
+    "gcPolicy": "default; no forced GC in the timed loop",
+    "goArch": "arm64",
+    "goOS": "darwin",
+    "goVersion": "go1.25.4",
+    "gomaxprocs": 1,
+    "hardware": "unavailable: exit status 1",
+    "logicalCPUs": "unavailable: exit status 1",
+    "osVersion": "26.5.2",
+    "physicalMemoryBytes": "unavailable: exit status 1",
+    "powerStatus": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=21954659)\t98%; charging; 0:21 remaining present: true",
+    "thermalTelemetry": "not collected"
+  },
+  "precomputeAllocatedBytes": 5593136,
+  "precomputeNS": 175286125,
+  "precomputeSamples": 1,
+  "productionDecoderTableReused": false,
+  "samples": [
+    {
+      "index": 1,
+      "exponent": 16569901,
+      "targetHex": "046238aa39828e803cdd7008d3b5f6156431dce87da636209431ad6e45a893ef1047793a170acbde08b8542c13ece9ba7b0050f0ab2e71b83c74a4390ab7b762",
+      "coldNS": 293927291,
+      "cachedNS": 119217459,
+      "order": "cold-then-cached",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 2,
+      "exponent": 3459899,
+      "targetHex": "02cf622d5412531828e6def808f9437c4b0481de619c7ac191324c55a906462a0d13b93b6f79a9b33c8265cdbd37083fc238b772ac747e2fc7f03e165a1d73d2",
+      "coldNS": 201529709,
+      "cachedNS": 24922833,
+      "order": "cached-then-cold",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 3,
+      "exponent": 1506248,
+      "targetHex": "1e887f979b5a5629626978865a3eb159c63c7204a872558c391a4b88857e86690ba120acdde5ac58370f428943c85c7047675c9f0c7ed7c6f830af71e8a79b18",
+      "coldNS": 186537750,
+      "cachedNS": 10405333,
+      "order": "cold-then-cached",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 4,
+      "exponent": 16008358,
+      "targetHex": "2127cdfd58e9f32e2aed75a98a933eb61a774a4ce17734e9b8ec0ba8157e715a13682a2f3397ab581cfb4bba0834ac9e36400b3df7b7c90508b0b367931a2c1d",
+      "coldNS": 287845083,
+      "cachedNS": 110940416,
+      "order": "cached-then-cold",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 5,
+      "exponent": 7042708,
+      "targetHex": "15dee69fd6adff18962a056cf0fb328ae97267c1ca85d8162ba4b40a71bccee7231791d877ff3862ba5e40ca9188bfea2d1af2d9ea09eec328622f2bac384cc8",
+      "coldNS": 225814333,
+      "cachedNS": 49562667,
+      "order": "cold-then-cached",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 6,
+      "exponent": 22925710,
+      "targetHex": "1e9b2312ab10c4da4de536ffaeea4382cddd032459310a8012f5d54e34e6adb52cab03745cdbb03a250f0d37898cf35ad8fecd7f8d6e134fb3478b2c0929b3de",
+      "coldNS": 334182292,
+      "cachedNS": 158991792,
+      "order": "cached-then-cold",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 7,
+      "exponent": 12768131,
+      "targetHex": "2c3472bf854cfa90d67b8b8cc4d2519a377587922bcf8579d4a056095b28dbee22c391f5ee7116bae189e845f63b13bc42261e44f7ee333dbbb91b48017c34ab",
+      "coldNS": 293157000,
+      "cachedNS": 91036958,
+      "order": "cold-then-cached",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 8,
+      "exponent": 20683362,
+      "targetHex": "0ec2d3724c082aece8a17c8774020bbb7fcd1d2e7eed49882e1968b67d546b941b078d36aeadbe27eb2588d10c6e569563c8993652ead0035773a83c2615d35f",
+      "coldNS": 319755167,
+      "cachedNS": 142807042,
+      "order": "cached-then-cold",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 9,
+      "exponent": 13099086,
+      "targetHex": "1961b3bdb08c4779267d29e81dfb5ebc4c0e47ff75f367d69225a4196a440fd52730197bcc3f7aa669a137f887294925d59ea5cb856c5dde6d8354b88bde4c7d",
+      "coldNS": 267486417,
+      "cachedNS": 91028541,
+      "order": "cold-then-cached",
+      "coldVerified": true,
+      "cacheVerified": true
+    },
+    {
+      "index": 10,
+      "exponent": 18860472,
+      "targetHex": "166f1f385b852407017f4d5942404e194b913a390d0e354c5e0cb42630c6f063048db55bd02dc61b78754b9bb6e7992b4eac465f2e8ee3cc3f9cc1519b184f5f",
+      "coldNS": 305396542,
+      "cachedNS": 129593417,
+      "order": "cached-then-cold",
+      "coldVerified": true,
+      "cacheVerified": true
+    }
+  ],
+  "sampling": "10 distinct uniform integer targets, ChaCha8 seeded by crypto/rand unless an explicit replay seed is supplied",
+  "schemaVersion": 1,
+  "scoreMax": 255,
+  "scoreMin": 0,
+  "seedHex": "77f8bcb643efe5a80122a9852bb3eab5f72f1b57f88c844ea0d090590ab6f62a",
+  "startedUTC": "2026-11-22T00:59:42.625598Z",
+  "status": "completed",
+  "tableEntries": 5050,
+  "timingExcludes": [
+    "random sampling",
+    "base and target generation",
+    "warmups",
+    "verification of recovered integers",
+    "report writing"
+  ],
+  "voters": 100000,
+  "warmupsPerPath": 3
+}

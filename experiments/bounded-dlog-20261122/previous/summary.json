@@ -1,0 +1,29 @@
+[
+  {
+    "metric": "production_decode_including_table",
+    "samples": 10,
+    "mean_ms": 271.5631584,
+    "sd_ms": 50.40221762822825,
+    "min_ms": 186.53775,
+    "median_ms": 290.5010415,
+    "max_ms": 334.182292
+  },
+  {
+    "metric": "cached_table_query",
+    "samples": 10,
+    "mean_ms": 92.8506458,
+    "sd_ms": 50.038483627901826,
+    "min_ms": 10.405333,
+    "median_ms": 100.988687,
+    "max_ms": 158.991792
+  },
+  {
+    "metric": "one_time_cached_table_construction",
+    "samples": 1,
+    "mean_ms": 175.286125,
+    "sd_ms": "",
+    "min_ms": 175.286125,
+    "median_ms": 175.286125,
+    "max_ms": 175.286125
+  }
+]

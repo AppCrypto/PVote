@@ -1,0 +1,289 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0000000000000000000000C8 /* PVoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000064 /* PVoteApp.swift */; };
+		0000000000000000000000C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000065 /* ContentView.swift */; };
+		0000000000000000000000CA /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000066 /* AppModel.swift */; };
+		0000000000000000000000CB /* NativeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000067 /* NativeEngine.swift */; };
+		0000000000000000000000CC /* Wallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000068 /* Wallet.swift */; };
+		0000000000000000000000CD /* ChainClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000069 /* ChainClient.swift */; };
+		00000000000000000000012D /* ../fixtures/fixtures.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000012C /* ../fixtures/fixtures.json */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000005 /* PVote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PVote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000064 /* PVoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PVoteApp.swift; sourceTree = "<group>"; };
+		000000000000000000000065 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		000000000000000000000066 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		000000000000000000000067 /* NativeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeEngine.swift; sourceTree = "<group>"; };
+		000000000000000000000068 /* Wallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Wallet.swift; sourceTree = "<group>"; };
+		000000000000000000000069 /* ChainClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainClient.swift; sourceTree = "<group>"; };
+		00000000000000000000012C /* ../fixtures/fixtures.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ../fixtures/fixtures.json; sourceTree = "<group>"; };
+		00000000000000000000012E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		00000000000000000000012F /* PVote-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "PVote-Bridging-Header.h"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000004 /* PVote */,
+				00000000000000000000012C /* ../fixtures/fixtures.json */,
+				000000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000005 /* PVote.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		000000000000000000000004 /* PVote */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000064 /* PVoteApp.swift */,
+				000000000000000000000065 /* ContentView.swift */,
+				000000000000000000000066 /* AppModel.swift */,
+				000000000000000000000067 /* NativeEngine.swift */,
+				000000000000000000000068 /* Wallet.swift */,
+				000000000000000000000069 /* ChainClient.swift */,
+				00000000000000000000012E /* Info.plist */,
+				00000000000000000000012F /* PVote-Bridging-Header.h */,
+			);
+			path = PVote;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000000000006 /* PVote */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 00000000000000000000000C /* Build configuration list for PBXNativeTarget "PVote" */;
+			buildPhases = (
+				00000000000000000000000A /* Build native Go cryptography */,
+				000000000000000000000007 /* Sources */,
+				000000000000000000000009 /* Frameworks */,
+				000000000000000000000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PVote;
+			productName = PVote;
+			productReference = 000000000000000000000005 /* PVote.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastSwiftUpdateCheck = 2610;
+				LastUpgradeCheck = 2610;
+				TargetAttributes = {
+					000000000000000000000006 = {
+						CreatedOnToolsVersion = 26.1;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 00000000000000000000000B /* Build configuration list for PBXProject "PVote" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000002;
+			productRefGroup = 000000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000000000006 /* PVote */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		000000000000000000000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				00000000000000000000012D /* ../fixtures/fixtures.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		00000000000000000000000A /* Build native Go cryptography */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Build native Go cryptography";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/../build_native.sh\" \"${PLATFORM_NAME}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0000000000000000000000C8 /* PVoteApp.swift in Sources */,
+				0000000000000000000000C9 /* ContentView.swift in Sources */,
+				0000000000000000000000CA /* AppModel.swift in Sources */,
+				0000000000000000000000CB /* NativeEngine.swift in Sources */,
+				0000000000000000000000CC /* Wallet.swift in Sources */,
+				0000000000000000000000CD /* ChainClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		00000000000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+			};
+			name = Debug;
+		};
+		00000000000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+			};
+			name = Release;
+		};
+		00000000000000000000000F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ZSCHH2F97F;
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PVote/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../build/$(PLATFORM_NAME)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lPVote",
+					"-lresolv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.appcrypto.pvote.research;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/PVote/PVote-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		000000000000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = ZSCHH2F97F;
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PVote/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../build/$(PLATFORM_NAME)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lPVote",
+					"-lresolv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.appcrypto.pvote.research;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/PVote/PVote-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		00000000000000000000000B /* Build configuration list for PBXProject "PVote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00000000000000000000000D /* Debug */,
+				00000000000000000000000E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		00000000000000000000000C /* Build configuration list for PBXNativeTarget "PVote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00000000000000000000000F /* Debug */,
+				000000000000000000000010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000001 /* Project object */;
+}

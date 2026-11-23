@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	huang "PVote/baselines/huang"
 	pri "PVote/baselines/priscore"
 	three "PVote/baselines/threepvss"
 	rbpvss "PVote/crypto/RBPVSS"
@@ -56,15 +55,8 @@ func main() {
 			rows = append(rows, r...)
 			rows = append(rows, structuralRows(n, l, t, 10, m)...)
 		}
-		for _, m := range []int{100, 250, 500, 1000} {
-			r, e := tallyScalingRows(*runs, n, l, t, 10, m)
-			if e != nil {
-				panic(e)
-			}
-			rows = append(rows, r...)
-			if m > 100 {
-				rows = append(rows, structuralRows(n, l, t, 10, m)...)
-			}
+		for _, m := range []int{250, 500, 1000} {
+			rows = append(rows, structuralRows(n, l, t, 10, m)...)
 		}
 	}
 	if e := write(*out, rows); e != nil {
@@ -73,58 +65,6 @@ func main() {
 	for _, r := range rows {
 		fmt.Printf("%-24s x=%-3d %-9s %-18s %.3f\n", r.experiment, r.x, r.scheme, r.phase, r.meanMS)
 	}
-}
-
-func tallyScalingRows(runs, n, l, t, budget, m int) ([]result, error) {
-	scores := distributed(l, budget)
-	scores64 := make([]int64, l)
-	for i := range scores {
-		scores64[i] = int64(scores[i])
-	}
-	pp, sks, err := rbpvss.Setup(128, n, t, l, rbpvss.Interval{Min: 0, Max: int64(budget)})
-	if err != nil {
-		return nil, err
-	}
-	agg, err := rbpvss.NewAggregate(pp)
-	if err != nil {
-		return nil, err
-	}
-	for i := 0; i < m; i++ {
-		inst, e := rbpvss.Share(pp, scores64)
-		if e != nil {
-			return nil, e
-		}
-		if e = rbpvss.AggregateVerified(pp, agg, inst); e != nil {
-			return nil, e
-		}
-	}
-	pv := mean(runs, func() {
-		shares := make([]rbpvss.IndexedShare, t)
-		for i := 0; i < t; i++ {
-			s, proof, e := rbpvss.Decrypt(pp, agg.C[i], sks[i])
-			must(e)
-			if !rbpvss.PVerify(pp, i+1, s, agg.C[i], proof) {
-				panic("PVerify")
-			}
-			shares[i] = rbpvss.IndexedShare{Index: i + 1, Share: s}
-		}
-		_, e := rbpvss.Recon(pp, shares, agg.U, rbpvss.Interval{Min: 0, Max: int64(m * budget)})
-		must(e)
-	})
-	hpp, err := huang.Setup(l, budget)
-	if err != nil {
-		return nil, err
-	}
-	ballots := make([]huang.Ballot, m)
-	for i := range ballots {
-		ballots[i], err = huang.Encrypt(hpp, scores)
-		if err != nil {
-			return nil, err
-		}
-	}
-	ht := mean(runs, func() { _, e := huang.Tally(hpp, ballots); must(e) })
-	note := "tally-path scaling on one BN254 backend with BSGS bounded decoding; Huang scans all m*l ciphertext pairs, PVote consumes t aggregate shares and l aggregate commitments"
-	return []result{{"huang_tally_scaling", m, "PVote", "aggregate finalization", pv, runs, n, l, t, budget, m, note}, {"huang_tally_scaling", m, "Huang et al.", "ciphertext scan", ht, runs, n, l, t, budget, m, note}}, nil
 }
 
 func structuralRows(n, l, t, budget, m int) []result {
@@ -138,7 +78,6 @@ func structuralRows(n, l, t, budget, m int) []result {
 	return []result{
 		{"finalization_working_set_kib", m, "PVote", "active aggregate", float64((n+l)*64) / 1024, 1, n, l, t, workingSetBudget, m, workingSetNote},
 		{"finalization_working_set_kib", m, "PriScore", "commit+ballot", float64(m*pri.PublicTranscriptBytes(p)) / 1024, 1, n, l, t, workingSetBudget, m, workingSetNote},
-		{"finalization_working_set_kib", m, "Huang et al.", "tally ciphertexts", float64(m*l*2*64) / 1024, 1, n, l, t, workingSetBudget, m, workingSetNote},
 		{"finalization_working_set_kib", m, "3PVSS-bit", "posted bit planes", float64(m*three.PublicBallotBytes(tp, kappa)) / 1024, 1, n, l, t, workingSetBudget, m, workingSetNote},
 		{"post_deadline_participants_normal", m, "PVote", "talliers", float64(t), 1, n, l, t, budget, m, participantNote},
 		{"post_deadline_participants_normal", m, "PriScore", "normal self-tally", 0, 1, n, l, t, budget, m, participantNote},
@@ -288,20 +227,8 @@ func finalizationRows(runs, n, l, t, budget, m int) ([]result, error) {
 		}
 	}
 	pr := mean(runs, func() { _, e := pri.SelfTally(priPP, ballots); must(e) })
-	hPP, e := huang.Setup(l, budget)
-	if e != nil {
-		return nil, e
-	}
-	hBallots := make([]huang.Ballot, m)
-	for i := range hBallots {
-		hBallots[i], e = huang.Encrypt(hPP, scores)
-		if e != nil {
-			return nil, e
-		}
-	}
-	ht := mean(runs, func() { _, e := huang.Tally(hPP, hBallots); must(e) })
-	note := "implemented post-deadline phases for PVote and PriScore; Huang row is its tally-relevant ciphertext scan and election-key decryption"
-	return []result{{"post_deadline_vs_voters", m, "PVote", "Decrypt+Recon", pv, runs, n, l, t, budget, m, note}, {"post_deadline_vs_voters", m, "PriScore", "Self-Tallying", pr, runs, n, l, t, budget, m, note}, {"post_deadline_vs_voters", m, "Huang et al.", "Tally scan", ht, runs, n, l, t, budget, m, note}}, nil
+	note := "implemented post-deadline phases for PVote and PriScore"
+	return []result{{"post_deadline_vs_voters", m, "PVote", "Decrypt+Recon", pv, runs, n, l, t, budget, m, note}, {"post_deadline_vs_voters", m, "PriScore", "Self-Tallying", pr, runs, n, l, t, budget, m, note}}, nil
 }
 
 func distributed(l, budget int) []int {

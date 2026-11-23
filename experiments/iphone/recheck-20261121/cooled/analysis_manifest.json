@@ -1,0 +1,60 @@
+{
+  "reports": [
+    {
+      "path": "experiments/iphone/recheck-20261121/cooled/raw/benchmark-2026-11-21T10-58-51Z-D90489D7.json",
+      "sha256": "b18dc369a4598de4cc081a1c252cbb10bd731f075f395b377121469607ea570e",
+      "round": 1,
+      "order": "ascending",
+      "startedAt": "2026-11-21T10:58:51Z",
+      "completedAt": "2026-11-21T10:59:41Z",
+      "additionalCoolingWaitSeconds": 295
+    },
+    {
+      "path": "experiments/iphone/recheck-20261121/cooled/raw/benchmark-2026-11-21T11-01-09Z-049F4A00.json",
+      "sha256": "8684c93022254e89aec5320781bad312b587293771ace3f480db2fb7500f9b60",
+      "round": 2,
+      "order": "descending",
+      "startedAt": "2026-11-21T11:01:09Z",
+      "completedAt": "2026-11-21T11:01:59Z",
+      "additionalCoolingWaitSeconds": 25
+    },
+    {
+      "path": "experiments/iphone/recheck-20261121/cooled/raw/benchmark-2026-11-21T11-03-17Z-3EAF8E0F.json",
+      "sha256": "6b1ba99386a56cc430461d496f47ebcbae4db64c314727c4d5a15f9931460193",
+      "round": 3,
+      "order": "rotated",
+      "startedAt": "2026-11-21T11:03:17Z",
+      "completedAt": "2026-11-21T11:04:07Z",
+      "additionalCoolingWaitSeconds": 15
+    }
+  ],
+  "samples": 2070,
+  "samplesPerConfiguration": 90,
+  "sourceSHA256": "d29d3d56bdc51a77965eb09afadf5a9afed4e3e810bad32a4ed340728927bd63",
+  "thermalBeforeAndAfter": {
+    "nominal": 4140
+  },
+  "batteryStateCounts": {
+    "1": 2070
+  },
+  "maximumSampledAppFootprintMiB": 47.969764709472656,
+  "largestConfiguration": {
+    "hardware": "iPhone14,5",
+    "iOSVersion": "26.6.2",
+    "sourceSHA256": "d29d3d56bdc51a77965eb09afadf5a9afed4e3e810bad32a4ed340728927bd63",
+    "protocol": "context-v1",
+    "parameterFingerprint": "02f55db3cd20ea0de21591721347623f8a208e8a471e0af92871803436912de7",
+    "n": 100,
+    "l": 19,
+    "t": 59,
+    "samples": 90,
+    "shareMeanMs": 68.27989355555556,
+    "shareSDMs": 4.004641666960117,
+    "shareMedianMs": 69.832521,
+    "shareP95Ms": 73.035584,
+    "encodeMeanMs": 0.6882407444444445,
+    "sampledAppFootprintMaxBytes": 48890920,
+    "transcriptBytes": 38560,
+    "calldataBytes": 39524
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "started_utc": "2026-11-20T12:37:35Z",
+  "finished_utc": "2026-11-20T12:37:39Z",
+  "completed": true,
+  "backend": "go-ethereum v1.14.6 native EVM / core.GenerateChain",
+  "execution": "in-memory London-rule chain; actual signed transactions, execution receipts and state transitions; fake PoW consensus, no live network",
+  "chain_config": {
+    "chainId": 1337,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "muirGlacierBlock": 0,
+    "berlinBlock": 0,
+    "londonBlock": 0,
+    "arrowGlacierBlock": 0,
+    "grayGlacierBlock": 0,
+    "terminalTotalDifficultyPassed": true,
+    "ethash": {}
+  },
+  "block_gas_limit": 90071992547,
+  "transaction_gas_limit": 180000000,
+  "voters_per_configuration_per_run": 2,
+  "runs_per_configuration": 3,
+  "n_l_configurations": [
+    [
+      10,
+      5
+    ],
+    [
+      50,
+      10
+    ],
+    [
+      100,
+      19
+    ]
+  ],
+  "go_version": "go1.25.4",
+  "platform": "darwin/amd64",
+  "deployment_bytecode_keccak256": "0x10f848c1629a1fe3b2c36156bca8b5b6ba98d02d21c07fc66d66f565fcb282f6",
+  "scope": "legacy Solidity transcript format; gas audit, not context-binding security validation; permissive local block gas limit, not mainnet deployment feasibility"
+}

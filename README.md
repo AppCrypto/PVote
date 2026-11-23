@@ -87,11 +87,8 @@ by the cross-protocol evaluation:
 - `baselines/threepvss`: the native individual-commitment 3PVSS Setup, Share,
   Verify, optimistic and pessimistic reconstruction, packed PDL proof,
   binary-vote proofs, decryption-share proofs, and the explicitly labeled
-  `kappa`-instance score adapter and Tally;
-- `baselines/huang`: the tally-relevant exponential-ElGamal ciphertext scan,
-  election-key decryption, and bounded decoding used for the explicitly scoped
-  Huang et al. tally-path experiment; it is not presented as a full-protocol
-  reproduction.
+  `kappa`-instance score adapter and Tally.
+
 
 Run their round-trip and tamper tests with `go test ./baselines/...`. Run the
 same-machine comparison of the implemented protocol phases with:
@@ -112,6 +109,67 @@ corresponding score-domain and finalization-working-set rows. The
 `voter_gas_by_m.csv` file fixes `(n, l) = (10, 1)` and records ten sequential
 accepted-ballot transactions to validate that steady-state per-voter gas does
 not grow with the accepted-ballot count.
+
+### Supplementary gas accounting and 1000-voter measurements
+
+The original ten-ballot CSVs are retained as historical measurements. New
+experiments do not modify the manuscript or replace those files. Run:
+
+```bash
+go run ./cmd/rbpvss-gas-audit -voters 2 -runs 3 -out experiments/gas-breakdown-new
+MPLCONFIGDIR=/private/tmp/pvote-matplotlib python3 scripts/summarize_gas_audit.py experiments/gas-breakdown-new --plot
+go run ./cmd/rbpvss-gas-audit -voters 1000 -runs 1 -out experiments/voter-scaling-1000-new
+MPLCONFIGDIR=/private/tmp/pvote-matplotlib python3 scripts/summarize_voter_scaling.py experiments/voter-scaling-1000-new --gas-audit experiments/gas-breakdown-new --plot
+```
+
+The audit uses actual signed transactions and `core.ApplyTransaction` receipts
+on a native go-ethereum v1.14.6 in-memory chain, with London gas rules, fake PoW
+consensus and a permissive block gas limit of 90,071,992,547. It executes the
+checked-in Solidity bytecode; it is not an operation-count-only simulation or a
+live network deployment. The legacy transcript format is retained, so this is
+a gas experiment rather than a test of the revised context binding. Voter keys
+are deterministic public development fixtures, with independent ballot randomness
+and zero scores in `[0,10]`. Every receipt's acceptance event is checked and the
+final `acceptedCount` getter is independently evaluated from the final state.
+
+The three `(n,l,t)` configurations are `(10,5,7)`, `(50,10,30)` and
+`(100,19,59)`. Component experiments use three independent deployments each,
+separating the first acceptance from the second. A 1000-voter run executes all
+1000 consecutive ballots per configuration, with tracing at `m=1,2,1000`.
+Outputs include all measurement rows, compressed signed transactions/receipts,
+fork and bytecode metadata, and JSON opcode/component accounting. The model
+checks EIP-1108 precompile prices, EIP-2028 calldata, EIP-2565 modular inverses,
+EIP-2200/2929 storage and EIP-3529 refunds. It subtracts forwarded CALL gas to
+avoid double counting. Memory expansion and other EVM instruction costs are
+reported separately; the decomposition must equal receipt gas exactly.
+
+For a live local Ganache reproduction with 1000 distinct funded accounts:
+
+```bash
+./scripts/run_voter_scaling_1000.sh experiments/voter-scaling-1000-ganache
+```
+
+This slower path uses Ganache 7.9.2, Merge execution rules and the same
+permissive gas limit. Merge permits the constructor containing the complete
+1000-account registry; the bytecode targets Paris. It records transactions and
+receipts without changing verifier checks. Public transactions archived from
+Ganache can also be replayed identically on native Geth:
+
+```bash
+go run ./cmd/rbpvss-gas-crosscheck -archive experiments/voter-scaling-1000-ganache/measurements.csv.receipts.jsonl.gz -out experiments/cross-client.csv
+```
+
+These experiments measure gas accounting and dependence on the accepted voter
+count. They do not establish feasibility under current mainnet transaction gas
+caps. See the supplementary `metadata.json`, `report.txt`, `summary.csv`, and
+`gas_breakdown.pdf` for the actual measured scope and results.
+
+The recorded supplementary runs are in `experiments/gas-breakdown` (18 traced
+acceptances) and `experiments/voter-scaling-1000-native` (3000 actual acceptances).
+The latter's `receipt_reconciliation.csv` checks the independent component
+model against every scaling receipt after inserting its calldata byte counts
+and first-write storage premium. Separate `response_draft.tex` files provide
+proposed replies; no manuscript text or original figure data is changed.
 
 The RB-PVSS tests cover single-dealer reconstruction, aggregate-only
 reconstruction, nonconsecutive tallier subsets, negative intervals, tampered
@@ -158,3 +216,7 @@ Regenerate the RB-PVSS verifier binding after changing its source:
 The removed legacy verification contract split one RB-PVSS transcript across
 multiple transactions and did not recompute all Fiat--Shamir challenges. It was
 therefore not an implementation of the paper's atomic `DVerify` interface.
+
+## iPhone voter app
+
+The native SwiftUI app and on-device Go RB-PVSS benchmarks are in [`mobile/`](mobile/README.md). Open `mobile/ios/PVote.xcodeproj` to build for iPhone. Public fixtures, local-chain election preparation, raw JSON/CSV export, and the physical-device measurement procedure are documented there. Device measurements must be collected on an actual iPhone; host tests and simulator builds are not mobile performance results.

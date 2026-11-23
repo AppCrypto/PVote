@@ -1,0 +1,44 @@
+{
+  "sourceFiles": {
+    "crypto/RBPVSS/context.go": "f2fde5ecd17e7ec80359a76986b0e6c50223eb465bf0c9753e51c7d28e4f300d",
+    "crypto/RBPVSS/context_test.go": "978019a99b581be6fd04ae8753f1eb485f3c26ee99bb8db3c06f6b7fe01e069a",
+    "crypto/RBPVSS/decoding_measurement_test.go": "2800a8b2ff154d560724f2410aeab402eb6abe3ec409245e9b822faa602f3500",
+    "crypto/RBPVSS/rbpvss.go": "1be9bf61a3e1f8e554186230614bb15ec5df92b48285bfc265f60ef3db098551",
+    "crypto/RBPVSS/rbpvss_test.go": "3b14ca399726773ae6e615303dd0e9f6f4ef728b47afa99acfaab823a5b0f0f1",
+    "go.mod": "d0fad0685499029eb6430eff95d5382bef52a6ab5ac3ee0f285831ec473f1048",
+    "go.sum": "fb74a3a3a49556e8c009faef7c8612d4b54882c3a57bee62d62b728543c9d3a4",
+    "scripts/run_bounded_dlog.py": "39e210f3bac915637f51b77a328a549fea2bf3a06984f420fe244423fdfdde97"
+  },
+  "sourceFingerprint": "efc0fcd0cedf1524c1363e0acaaa211013f33d6d58d9cdfd1c6105611a28c8e3",
+  "binarySHA256": "b5ed970a053f4d01eaa1c8475e02b4a4cabdb29a366174dea985fe6e7700b4a7",
+  "buildCommand": [
+    "go",
+    "test",
+    "-c",
+    "-trimpath",
+    "-o",
+    "/var/folders/9l/h58fv8p91ln3t46d70m_b75h0000gn/T/pvote-bounded-dlog-yt4err24/decode.test",
+    "./crypto/RBPVSS"
+  ],
+  "runCommand": [
+    "/var/folders/9l/h58fv8p91ln3t46d70m_b75h0000gn/T/pvote-bounded-dlog-yt4err24/decode.test",
+    "-test.run=^TestBoundedDLogMeasurement$",
+    "-test.count=1",
+    "-test.v"
+  ],
+  "buildEnvironment": {
+    "GOOS": "darwin",
+    "GOARCH": "arm64",
+    "CGO_ENABLED": "0",
+    "GOCACHE": "/private/tmp/pvote-go-cache"
+  },
+  "outputs": {
+    "raw.json": "2bdba43de13ef3b324699065a53a66f29ab7471bb2b0967314cdf7916c16a337",
+    "samples.csv": "7a5210061d3a380c007fe4141a3385e1daa095b513a8ac015a1c4e9de297e95a",
+    "summary.csv": "12c40772d06a53a322e283ead03d1fb05c76bbe95823d0c1037d4dff0c880c69",
+    "summary.json": "7f87db306d900339dd580b85b22a7abffec9066b84232991665827fd12fb4336",
+    "hardware_metadata.json": "e8f8f1fe7ca7618d414db1d2c9a70e611237faf24715dfe3b48517ecdb7701b6",
+    "README.md": "41240f10791dde3bf57689bc59a403682100dbcd614b95c2ea142bf01d581816"
+  },
+  "hardwareVerification": "hardware_metadata.json; original in-process probe failures left unchanged"
+}

@@ -1,0 +1,22 @@
+{
+  "sourceFiles": {
+    "crypto/RBPVSS/context.go": "f2fde5ecd17e7ec80359a76986b0e6c50223eb465bf0c9753e51c7d28e4f300d",
+    "crypto/RBPVSS/context_test.go": "978019a99b581be6fd04ae8753f1eb485f3c26ee99bb8db3c06f6b7fe01e069a",
+    "crypto/RBPVSS/decoding_measurement_test.go": "b2fecd131d504a8c171e208e36d4e195da61df4691c3a2a1868a973ebfb49b98",
+    "crypto/RBPVSS/rbpvss.go": "1be9bf61a3e1f8e554186230614bb15ec5df92b48285bfc265f60ef3db098551",
+    "crypto/RBPVSS/rbpvss_test.go": "3b14ca399726773ae6e615303dd0e9f6f4ef728b47afa99acfaab823a5b0f0f1",
+    "go.mod": "d0fad0685499029eb6430eff95d5382bef52a6ab5ac3ee0f285831ec473f1048",
+    "go.sum": "fb74a3a3a49556e8c009faef7c8612d4b54882c3a57bee62d62b728543c9d3a4",
+    "mobile/fixtures/fixtures.json": "ed04aaa732beedff8175546ebf3343bda1d69313cf3134968977b354b7a7a574",
+    "scripts/run_bounded_dlog.py": "d0f2ccd51e2b6a24b7b35ea2dc20580ecc0fcacc9d2736fd1bb08459a3818bca"
+  },
+  "binarySHA256": "5263fbb9da5edf83ec083ec7e9e054e6d7655835b6e20de2b9ec7f468bf3b81e",
+  "outputs": {
+    "raw.json": "0ff7474b154e5559a7737357522386e019a5d7448c64a9d94bd3009c9a38ee09",
+    "samples.csv": "f8b35b79f98d0354ce820352eb8cf43447d409271dab94e189a9b742e8353f72",
+    "summary.csv": "4c39cf263419eaaef23b200ed4afbd1872157a201b96e68089fa3961d4f1ed05",
+    "summary.json": "175aa992f517eb23442efbf72ab157809fa249f07f7753c3f4199fb000843beb",
+    "README.md": "f0365ecdb53a6bd3bf860cb418a87ee3fc55ef7e00fbd33b0045045b672b22bf",
+    "hardware_metadata.json": "459c05360df656cd1bf210685b5ba864f89be120c90c5445df18525806b888a7"
+  }
+}

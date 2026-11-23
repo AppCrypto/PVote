@@ -1,0 +1,32 @@
+{
+  "reports": [
+    {
+      "path": "experiments/mac-generation-20261121/raw/benchmark-2026-11-21T11-31-42.012522000Z-mac.json",
+      "sha256": "64e275168b87b0f8e8cf95571778b520d433e0d98bf939232902dde9cc8d9cd6",
+      "order": "ascending",
+      "samples": 240,
+      "sourceSHA256": "d4714378bcf8d9a4f5f86dd83dd46aea827551d333da8efbd9b6a12a0ea925b2"
+    },
+    {
+      "path": "experiments/mac-generation-20261121/raw/benchmark-2026-11-21T11-33-32.542371000Z-mac.json",
+      "sha256": "692b5f1d1be9e9faee7ac7eeafbfa74f2291c5e682235ae4e6639f65f062d165",
+      "order": "descending",
+      "samples": 240,
+      "sourceSHA256": "d4714378bcf8d9a4f5f86dd83dd46aea827551d333da8efbd9b6a12a0ea925b2"
+    },
+    {
+      "path": "experiments/mac-generation-20261121/raw/benchmark-2026-11-21T11-35-22.785297000Z-mac.json",
+      "sha256": "a6537f5872d0a18ebdfdcad0e6fdaaf866165777011a75271ead95aa28b51f3c",
+      "order": "rotated",
+      "samples": 240,
+      "sourceSHA256": "d4714378bcf8d9a4f5f86dd83dd46aea827551d333da8efbd9b6a12a0ea925b2"
+    }
+  ],
+  "hardwareMetadata": "hardware_metadata.json",
+  "samples": 720,
+  "samplesPerConfiguration": 30,
+  "platform": "macOS",
+  "figure": "fig:score_domain",
+  "hardwareMetadataSHA256": "64cdc83d643831d3d7d2eb2b125ffd33d87898db937cafcb14c515778541209e",
+  "publicationRole": "retained Mac generation reference; current Figure 12(a) uses iPhone data"
+}

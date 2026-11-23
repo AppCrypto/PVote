@@ -1,0 +1,18 @@
+{
+  "source_sha256": {
+    "cmd/rbpvss-gas-audit/main.go": "8220a24a5a51242e5270133172e12cc9de6a82ecf8ed9f9e8c91505d734fe444",
+    "cmd/rbpvss-gas-audit/trace.go": "97502566f8f5ad37e9d4c3ede896f59b9dd100c901853e841e3c9f0574c63cab",
+    "crypto/RBPVSS/rbpvss.go": "1be9bf61a3e1f8e554186230614bb15ec5df92b48285bfc265f60ef3db098551",
+    "compile/contract/RBPVSSVerifier.sol": "0300228f1cc197ca6fb57ac46265a3abee7715f02133d438551f155f441c049f",
+    "compile/contract/RBPVSSVerifier.go": "7709beb03959855be57fa4286747ddecd8d52cdfe170021ff21d0469304a8846",
+    "go.mod": "d0fad0685499029eb6430eff95d5382bef52a6ab5ac3ee0f285831ec473f1048",
+    "go.sum": "fb74a3a3a49556e8c009faef7c8612d4b54882c3a57bee62d62b728543c9d3a4"
+  },
+  "executable_sha256": "46afa09afb3b97a22917edae0d12d4e4fdf52dcbc409f71f2114273e837dcbb3",
+  "score_policy": "fresh polynomial and proof randomness per voter; all coordinates are 0 in S=[0,10]",
+  "analysis_source_sha256": {
+    "scripts/summarize_gas_audit.py": "7e60ef2f6d508c1b711b99c3ed4182127fdba37f01e12b662433d4d7976fd731",
+    "scripts/summarize_voter_scaling.py": "cebf9b0edb8d319cc85e445a24a90e0e572c7de2d19d44e1718d0a231613911a",
+    "cmd/rbpvss-gas-crosscheck/main.go": "a20a5094e025e0b3d56d3bdcbb8db39549de054a66953a7a81f86ea25d2509e2"
+  }
+}

@@ -1,5 +1,5 @@
 // Package ec contains the small BN254 helpers shared by the independent
-// PriScore, 3PVSS, and Huang reproductions. Protocol algorithms remain in their
+// PriScore and 3PVSS reproductions. Protocol algorithms remain in their
 // respective packages; this package only centralizes constant-time group and
 // scalar plumbing.
 package ec

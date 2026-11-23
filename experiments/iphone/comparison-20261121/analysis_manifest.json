@@ -1,0 +1,65 @@
+{
+  "reports": [
+    {
+      "path": "experiments/iphone/comparison-20261121/raw/benchmark-2026-11-21T13-24-45Z-cmp-3B01B17D.json",
+      "sha256": "92c8f20b4ad87768d179be1770a426d1f332ea9034f50daa8fa67e37c970b535",
+      "round": 1,
+      "order": "ascending",
+      "startedAt": "2026-11-21T13:24:45Z",
+      "completedAt": "2026-11-21T13:26:09Z",
+      "samples": 240
+    },
+    {
+      "path": "experiments/iphone/comparison-20261121/raw/benchmark-2026-11-21T13-27-12Z-cmp-F316BBCB.json",
+      "sha256": "658658b0f35e85794480accbb4a0260fbe4bf6d3a4091bd3c00e634119301341",
+      "round": 2,
+      "order": "descending",
+      "startedAt": "2026-11-21T13:27:12Z",
+      "completedAt": "2026-11-21T13:28:36Z",
+      "samples": 240
+    },
+    {
+      "path": "experiments/iphone/comparison-20261121/raw/benchmark-2026-11-21T13-29-40Z-cmp-CCCBFCFB.json",
+      "sha256": "53cc6ca16b6956553711b5df1af04eef6ce8ab6bd1389952bc10bf956c0f8107",
+      "round": 3,
+      "order": "rotated",
+      "startedAt": "2026-11-21T13:29:40Z",
+      "completedAt": "2026-11-21T13:31:05Z",
+      "samples": 240
+    }
+  ],
+  "metadata": {
+    "appVersion": "0.1.0",
+    "buildConfiguration": "Release",
+    "deviceModel": "iPhone",
+    "gcPolicy": "Go default (enabled)",
+    "goArch": "arm64",
+    "gomaxprocs": 1,
+    "goOS": "ios",
+    "goVersion": "go1.25.4",
+    "hardwareIdentifier": "iPhone14,5",
+    "iOSVersion": "26.6.2",
+    "isSimulator": false,
+    "osVersion": "Version 26.6.2 (Build 23G90)",
+    "physicalMemoryBytes": 3840311296,
+    "processorCount": 6,
+    "protocols": [
+      "legacy-solidity-v1",
+      "context-v1"
+    ],
+    "revision": "8154793a868f-dirty",
+    "sourceSHA256": "8e478489c748a03c5153e152505ffa8495d4c8346b1a8bc217c201e490fc151e"
+  },
+  "samples": 720,
+  "samplesPerConfiguration": 30,
+  "thermalBeforeAndAfter": {
+    "nominal": 1440
+  },
+  "batteryStateBeforeAndAfter": {
+    "1": 1440
+  },
+  "excludedSamples": 0,
+  "maximumSampledAppFootprintMiB": 46.04784393310547,
+  "figure": "fig:score_domain(a)",
+  "publicationRole": "primary iPhone generation data"
+}
